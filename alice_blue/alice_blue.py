@@ -198,10 +198,10 @@ class AliceBlue:
             profile = self.__api_call_helper('profile', Requests.GET, None, None)
         except Exception as e:
             logging.info(f"Couldn't get profile info with credentials provided {e}")
-            return
+            raise Exception(f"Couldn't get profile info with credentials provided {e}")
         if('error' in profile):
             logging.info(f"Couldn't get profile info {profile['message']}")
-            return
+            raise Exception(f"Couldn't get profile info {profile['message']}")
         self.__enabled_exchanges = profile['data']['exchanges']
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
