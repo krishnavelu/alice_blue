@@ -9,11 +9,8 @@ The HTTP calls have been converted to methods and JSON responses are wrapped int
 
 Websocket connections are handled automatically within the library
 
-## Disclaimer
-* At the time of this writing, this is the only python library available to support Alice Blue trading APIs. This is not an official release from Alice Blue itself. 
-* Author of this library is no way commercially linked with broker Alice Blue.
-* This library is released with an intention of public contribution. 
-* Author of this library is not resposible for any amout of losses incurred by using this library.
+* Author: [krishnavelu](https://github.com/krishnavelu/)
+* [Unofficed](https://www.unofficed.com/) is strategic partner of Alice Blue responsible for this git.
 
 ## Installation
 
