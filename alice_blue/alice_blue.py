@@ -164,6 +164,7 @@ class AliceBlue:
           'modify_order': '/api/v2/order',
           'cancel_order': '/api/v2/order?oms_order_id={order_id}&order_status=open',
           'trade_book': '/api/v2/trade',
+          'scripinfo': '/api/v2/scripinfo?exchange={exchange}&instrument_token={token}',
       },
       'socket_endpoint': 'wss://ant.aliceblueonline.com/hydrasocket/v2/websocket?access_token={access_token}'
     }
@@ -402,6 +403,10 @@ class AliceBlue:
             return self.__api_call_helper('get_orders', Requests.GET, None, None);
         else:
             return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None);
+    
+    def get_scrip_info(self, instrument):
+        params = {'exchange': instrument.exchange, 'token': instrument.token}
+        return self.__api_call_helper('scripinfo', Requests.GET, params, None)
 
     def get_trade_book(self):
         """ get all trades """
