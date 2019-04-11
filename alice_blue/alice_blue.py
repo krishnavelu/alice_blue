@@ -209,8 +209,7 @@ class AliceBlue:
                 self.__get_master_contract(e)
         else:
             for e in master_contracts_to_download:
-                if(e in self.__enabled_exchanges):
-                    self.__get_master_contract(e)
+                self.__get_master_contract(e)
         self.ws_thread = None
 
     @staticmethod
@@ -564,9 +563,6 @@ class AliceBlue:
                 if not isinstance(_instrument, Instrument):
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
-                if _instrument.exchange not in self.__enabled_exchanges:
-                    logging.warning(f'Invalid exchange value provided: {_instrument.exchange}')
-                    raise TypeError(f"Please provide a valid exchange {self.__enabled_exchanges})")
                 arr.append([exchange, int(_instrument.token)])
                 self.__subscribers[_instrument.token] = live_feed_type
         else:
@@ -598,9 +594,6 @@ class AliceBlue:
                 if not isinstance(_instrument, Instrument):
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
-                if _instrument.exchange not in self.__enabled_exchanges:
-                    logging.warning(f'Invalid exchange value provided: {_instrument.exchange}')
-                    raise TypeError(f"Please provide a valid exchange {self.__enabled_exchanges})")
                 arr.append([exchange, int(_instrument.token)])
                 if(_instrument.token in self.__subscribers): del self.__subscribers[_instrument.token]
         else:
@@ -696,11 +689,6 @@ class AliceBlue:
         """ returns all the tradable contracts of an exchange
             placed in an OrderedDict and the key is the token
         """
-        exchange = exchange.upper()
-        if exchange not in self.__enabled_exchanges:
-            logging.warning(f'Invalid exchange value provided: {exchange}, enabled exchanges for your account are {self.__enabled_exchanges}')
-            raise ValueError(f"Please provide a valid exchange {self.__enabled_exchanges}")
-
         logging.debug(f'Downloading master contracts for exchange: {exchange}')
         body = self.__api_call_helper('master_contract', Requests.GET, {'exchange': exchange}, None)
         master_contract_by_token = OrderedDict()
