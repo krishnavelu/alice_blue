@@ -649,8 +649,8 @@ class AliceBlue:
                     return i
             else:
                 sp = i.symbol.split(' ')
-                if(len(sp) == 4):           # Only option scrips 
-                    if(sp[2] == str(strike)):
+                if((sp[-1] == 'CE') or (sp[-1] == 'PE')):           # Only option scrips 
+                    if(sp[-2] == str(strike)):
                         if(is_CE == True):
                             if(sp[-1] == 'CE'):
                                 return i
