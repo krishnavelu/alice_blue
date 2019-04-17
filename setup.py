@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name = 'alice_blue',
     packages=setuptools.find_packages(),
-    version = '0.0.3',
+    version = '0.0.4',
     include_package_data=True,
     description = 'Python library for Alice Blue APIs',
     long_description=long_description,
