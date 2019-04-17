@@ -294,7 +294,9 @@ class AliceBlue:
         dictionary = self.__convert_instrument(dictionary)
         return dictionary
 
-    def __on_data_callback(self, message, data_type, continue_flag):
+    def __on_data_callback(self, ws=None, message=None, data_type=None, continue_flag=None):
+        if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
+            message = ws
         if(message[0] == WsFrameMode.MARKETDATA):
             p = MarketData.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
@@ -332,15 +334,17 @@ class AliceBlue:
 #             res = self.__modify_human_readable_values(p) 
             return
          
-    def __on_close_callback(self):
+    def __on_close_callback(self, ws=None):
         if self.__on_disconnect:
             self.__on_disconnect()
 
-    def __on_open_callback(self):
+    def __on_open_callback(self, ws=None):
         if self.__on_open:
             self.__on_open()
 
-    def __on_error_callback(self, error):
+    def __on_error_callback(self, ws=None, error=None):
+        if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
+            message = ws
         if self.__on_error:
             self.__on_error(error)
 
@@ -547,7 +551,8 @@ class AliceBlue:
                    'price':price,
                    'trigger_price':trigger_price,
                    'quantity':quantity,
-                   'disclosed_quantity':0}
+                   'disclosed_quantity':0,
+                   'nest_request_id' : '1'}
         return self.__api_call_helper('modify_order', Requests.PUT, None, order)
 
     def cancel_order(self, order_id):
