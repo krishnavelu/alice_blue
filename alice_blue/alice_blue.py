@@ -196,12 +196,11 @@ class AliceBlue:
                                              7: 100}
 
         try:
-            profile = self.__api_call_helper('profile', Requests.GET, None, None)
+            profile = self.get_profile()
         except Exception as e:
             raise Exception(f"Couldn't get profile info with credentials provided {e}")
         if(profile['status'] == 'error'):
             raise Exception(f"Couldn't get profile info {profile['message']}")
-        self.__enabled_exchanges = profile['data']['exchanges']
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
         if(master_contracts_to_download == None):
@@ -344,7 +343,7 @@ class AliceBlue:
 
     def __on_error_callback(self, ws=None, error=None):
         if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
-            message = ws
+            error = ws
         if self.__on_error:
             self.__on_error(error)
 
@@ -384,7 +383,10 @@ class AliceBlue:
             self.__websocket.run_forever()
 
     def get_profile(self):
-        return self.__api_call_helper('profile', Requests.GET, None, None)
+        profile = self.__api_call_helper('profile', Requests.GET, None, None)
+        if(profile['status'] is not 'error'):
+            self.__enabled_exchanges = profile['data']['exchanges']
+        return profile
 
     def get_balance(self):
         return self.__api_call_helper('balance', Requests.GET, None, None)
@@ -740,9 +742,14 @@ class AliceBlue:
         return json.loads(response.text)
 
     def __api_call(self, url, http_method, data):
-        headers = {"Content-Type": "application/json", "client_id": self.__username,
-                   "authorization": f"Bearer {self.__access_token}"}
         #logging.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
+        headers = {"Content-Type": "application/json"} 
+        if(len(self.__access_token) > 100):
+            headers['X-Authorization-Token'] = self.__access_token
+            headers['Connection'] = 'keep-alive'
+        else:
+            headers['client_id'] = self.__username
+            headers['authorization'] = f"Bearer {self.__access_token}"
         r = None
         if http_method is Requests.POST:
             r = requests.post(url, data=json.dumps(data), headers=headers)
