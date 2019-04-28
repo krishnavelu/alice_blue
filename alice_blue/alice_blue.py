@@ -350,7 +350,7 @@ class AliceBlue:
     def __send_heartbeat(self):
         heart_beat = {"a": "h", "v": [], "m": ""}
         while True:
-            sleep(10)
+            sleep(5)
             with self.__ws_mutex:
                 self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
 
