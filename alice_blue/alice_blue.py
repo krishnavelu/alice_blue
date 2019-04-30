@@ -352,6 +352,7 @@ class AliceBlue:
         while True:
             sleep(5)
             with self.__ws_mutex:
+                logging.info("sending heartbeat")
                 self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
 
     def start_websocket(self, subscribe_callback = None, 
