@@ -349,10 +349,15 @@ class AliceBlue:
 
     def __send_heartbeat(self):
         heart_beat = {"a": "h", "v": [], "m": ""}
+        ts = datetime.datetime.now()
+        prev_ts = ts
         while True:
             sleep(5)
             with self.__ws_mutex:
-                logging.info("sending heartbeat")
+                ts = datetime.datetime.now()
+                diff = ts - prev_ts 
+                prev_ts = ts
+                logging.info(f"sending heartbeat, diff - {diff}")
                 self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
 
     def start_websocket(self, subscribe_callback = None, 
