@@ -198,9 +198,9 @@ class AliceBlue:
         try:
             profile = self.get_profile()
         except Exception as e:
-            raise Exception(f"Couldn't get profile info with credentials provided {e}")
+            raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         if(profile['status'] == 'error'):
-            raise Exception(f"Couldn't get profile info {profile['message']}")
+            raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
         if(master_contracts_to_download == None):
@@ -384,8 +384,12 @@ class AliceBlue:
 
     def get_profile(self):
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
-        if(profile['status'] is not 'error'):
-            self.__enabled_exchanges = profile['data']['exchanges']
+        if(type(profile) is not dict):
+            logging.info(f"Profile is not of type dict, its {type(profile)}. Value - {profile}")
+            return None
+        else:
+            if(profile['status'] is not 'error'):
+                self.__enabled_exchanges = profile['data']['exchanges']
         return profile
 
     def get_balance(self):
