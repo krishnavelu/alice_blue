@@ -384,12 +384,8 @@ class AliceBlue:
 
     def get_profile(self):
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
-        if(type(profile) is not dict):
-            logging.info(f"Profile is not of type dict, its {type(profile)}. Value - {profile}")
-            return None
-        else:
-            if(profile['status'] is not 'error'):
-                self.__enabled_exchanges = profile['data']['exchanges']
+        if(profile['status'] != 'error'):
+            self.__enabled_exchanges = profile['data']['exchanges']
         return profile
 
     def get_balance(self):
