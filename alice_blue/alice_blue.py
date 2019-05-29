@@ -200,7 +200,10 @@ class AliceBlue:
         except Exception as e:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         if(profile['status'] == 'error'):
-            raise Exception(f"Couldn't get profile info '{profile['message']}'")
+            if(profile['message'] == 'Not able to retrieve AccountInfoService'):     # Don't know why this error comes, but it safe to proceed further.
+                logging.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
+            else:
+                raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
         if(master_contracts_to_download == None):
