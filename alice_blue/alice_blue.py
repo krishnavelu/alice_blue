@@ -356,6 +356,13 @@ class AliceBlue:
             sleep(5)
             with self.__ws_mutex:
                 self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
+    
+    def __ws_run_forever(self):
+        while True:
+            try:
+                self.__websocket.run_forever()
+            except:
+                pass
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -379,11 +386,11 @@ class AliceBlue:
         th.daemon = True
         th.start()
         if run_in_background is True:
-            self.__ws_thread = threading.Thread(target=self.__websocket.run_forever)
+            self.__ws_thread = threading.Thread(target=self.__ws_run_forever)
             self.__ws_thread.daemon = True
             self.__ws_thread.start()
         else:
-            self.__websocket.run_forever()
+            self.__ws_run_forever
 
     def get_profile(self):
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
