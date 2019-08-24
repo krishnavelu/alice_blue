@@ -361,8 +361,9 @@ class AliceBlue:
         while True:
             try:
                 self.__websocket.run_forever()
-            except:
-                pass
+            except Exception as e:
+                logging.info(f"websocket run forever ended in exception, {e}")
+            sleep(0.1) # Sleep for 100ms between reconnection.
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
