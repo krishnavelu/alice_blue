@@ -196,12 +196,14 @@ class AliceBlue:
                                              7: 100}
 
         try:
-            profile = self.__api_call_helper('profile', Requests.GET, None, None)
+            profile = self.get_profile()
         except Exception as e:
-            raise Exception(f"Couldn't get profile info with credentials provided {e}")
+            raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         if(profile['status'] == 'error'):
-            raise Exception(f"Couldn't get profile info {profile['message']}")
-        self.__enabled_exchanges = profile['data']['exchanges']
+            if(profile['message'] == 'Not able to retrieve AccountInfoService'):     # Don't know why this error comes, but it safe to proceed further.
+                logging.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
+            else:
+                raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
         if(master_contracts_to_download == None):
@@ -344,16 +346,24 @@ class AliceBlue:
 
     def __on_error_callback(self, ws=None, error=None):
         if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
-            message = ws
+            error = ws
         if self.__on_error:
             self.__on_error(error)
 
     def __send_heartbeat(self):
         heart_beat = {"a": "h", "v": [], "m": ""}
         while True:
-            sleep(10)
+            sleep(5)
             with self.__ws_mutex:
                 self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
+    
+    def __ws_run_forever(self):
+        while True:
+            try:
+                self.__websocket.run_forever()
+            except Exception as e:
+                logging.info(f"websocket run forever ended in exception, {e}")
+            sleep(0.1) # Sleep for 100ms between reconnection.
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -377,14 +387,17 @@ class AliceBlue:
         th.daemon = True
         th.start()
         if run_in_background is True:
-            self.__ws_thread = threading.Thread(target=self.__websocket.run_forever)
+            self.__ws_thread = threading.Thread(target=self.__ws_run_forever)
             self.__ws_thread.daemon = True
             self.__ws_thread.start()
         else:
-            self.__websocket.run_forever()
+            self.__ws_run_forever
 
     def get_profile(self):
-        return self.__api_call_helper('profile', Requests.GET, None, None)
+        profile = self.__api_call_helper('profile', Requests.GET, None, None)
+        if(profile['status'] != 'error'):
+            self.__enabled_exchanges = profile['data']['exchanges']
+        return profile
 
     def get_balance(self):
         return self.__api_call_helper('balance', Requests.GET, None, None)
@@ -740,9 +753,14 @@ class AliceBlue:
         return json.loads(response.text)
 
     def __api_call(self, url, http_method, data):
-        headers = {"Content-Type": "application/json", "client_id": self.__username,
-                   "authorization": f"Bearer {self.__access_token}"}
         #logging.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
+        headers = {"Content-Type": "application/json"} 
+        if(len(self.__access_token) > 100):
+            headers['X-Authorization-Token'] = self.__access_token
+            headers['Connection'] = 'keep-alive'
+        else:
+            headers['client_id'] = self.__username
+            headers['authorization'] = f"Bearer {self.__access_token}"
         r = None
         if http_method is Requests.POST:
             r = requests.post(url, data=json.dumps(data), headers=headers)

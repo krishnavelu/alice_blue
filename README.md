@@ -60,6 +60,10 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
+### Get api_secret
+api_secret is unique for each and every account. You need to enable api trading and get api_secret from alice blue.
+Plesae [contact](https://www.aliceblueonline.com/contact-us/) alice blue for getting api_secret.
+ 
 ### Get an access token
 1. Import alice_blue
 ```python
@@ -160,6 +164,7 @@ Subscribe to multiple instruments in a single call. Give an array of instruments
 ```python
 alice.subscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get_instrument_by_symbol('NSE', 'ACC')], LiveFeedType.MARKET_DATA)
 ```
+Note: There is a limit of 250 scrips that can be subscribed on total. Beyond this point the server may disconnect web-socket connection. 
 
 Start getting live feed via socket
 
