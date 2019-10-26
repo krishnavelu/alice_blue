@@ -516,6 +516,71 @@ class AliceBlue:
             helper = 'place_order'
         return self.__api_call_helper(helper, Requests.POST, None, order)
 
+    def place_basket_order(self, orders):
+        """ placing a basket order, 
+            Argument orders should be a list of all orders that should be sent
+            each element in order should be a dictionary containing the following key.
+            "instrument", "order_type", "quantity", "price" (only if its a limit order), 
+            "transaction_type", "product_type"
+        """
+        keys = {"instrument"        : Instrument, 
+                "order_type"        : OrderType, 
+                "quantity"          : int,
+                "transaction_type"  : TransactionType,
+                "product_type"      : ProductType}
+        if not isinstance(orders, list):
+            raise TypeError("Required parameter orders is not of type list")
+
+        if len(orders) <= 0:
+            raise TypeError("Length of orders should be greater than 0")
+
+        for i in orders:
+            if not isinstance(i, dict):
+                raise TypeError("Each element in orders should be of type dict")
+            for s in keys:
+                if s not in i:
+                    raise TypeError(f"Each element in orders should have key {s}")
+                if type(i[s]) is not keys[s]:  
+                    raise TypeError(f"Element '{s}' in orders should be of type {keys[s]}")
+            if i['order_type'] == OrderType.Limit:
+                if "price" not in i:
+                    raise TypeError("Each element in orders should have key 'price' if its a limit order ")
+                if isinstance(i['price'], float):
+                    raise TypeError("Element price in orders should be of type float")
+            else:
+                i['price'] = 0.0
+            if(i['product_type'] == ProductType.Intraday):
+                i['product_type'] = 'MIS'
+            elif(i['product_type'] == ProductType.Delivery):
+                if(i['instrument'].exchange == 'NFO'):
+                    i['product_type'] = 'NRML'
+                else:
+                    i['product_type'] = 'CNC'
+            elif(i['product_type'] == ProductType.CoverOrder):
+                raise TypeError("Product Type BO or CO is not supported in basket order")
+            elif(i['product_type'] == ProductType.BracketOrder):
+                raise TypeError("Product Type BO or CO is not supported in basket order")
+            if i['quantity'] <= 0:
+                raise TypeError("Quantity should be greater than 0")
+
+        data = {'source':'web',
+                'orders' : []}
+        for i in orders:
+            # construct order object after all required parameters are met
+            data['orders'].append({'exchange'           : i['instrument'].exchange,
+                                   'order_type'         : i['order_type'].value,
+                                   'instrument_token'   : i['instrument'].token,
+                                   'quantity'           : i['quantity'],
+                                   'disclosed_quantity' : 0,
+                                   'price'              : i['price'],
+                                   'transaction_type'   : i['transaction_type'].value,
+                                   'trigger_price'      : 0,
+                                   'validity'           : 'DAY',
+                                   'product'            : i['product_type']})
+
+        helper = 'place_basket_order'
+        return self.__api_call_helper(helper, Requests.POST, None, data)
+
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity=None, price=0.0,
                      trigger_price=0.0):
         """ modify an order, only order id is required, rest are optional, use only when
