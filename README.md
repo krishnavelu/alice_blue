@@ -443,6 +443,23 @@ print(alice.place_basket_order(orders))
 alice.cancel_order('170713000075481') #Cancel an open order
 ```
 
+### Getting order history and trade details
+
+#### Get order history of a particular order
+```python
+print(alice.get_order_history('170713000075481'))
+```
+
+#### Get order history of all orders.
+```python
+print(alice.get_order_history())
+```
+
+#### Get trade book
+```python
+print(alice.get_trade_book())
+```
+
 ### Order properties as enums
 Order properties such as TransactionType, OrderType, and others have been safely classified as enums so you don't have to write them out as strings
 
