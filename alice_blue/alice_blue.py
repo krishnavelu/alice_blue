@@ -391,7 +391,7 @@ class AliceBlue:
             self.__ws_thread.daemon = True
             self.__ws_thread.start()
         else:
-            self.__ws_run_forever
+            self.__ws_run_forever()
 
     def get_profile(self):
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
