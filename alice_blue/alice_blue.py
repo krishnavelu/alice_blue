@@ -175,6 +175,7 @@ class AliceBlue:
         self.__username = username
         self.__password = password
         self.__websocket = None
+        self.__websocket_connected = False
         self.__ws_mutex = threading.Lock()
         self.__on_error = None
         self.__on_disconnect = None
@@ -337,10 +338,12 @@ class AliceBlue:
             return
          
     def __on_close_callback(self, ws=None):
+        self.__websocket_connected = False
         if self.__on_disconnect:
             self.__on_disconnect()
 
     def __on_open_callback(self, ws=None):
+        self.__websocket_connected = True
         if self.__on_open:
             self.__on_open()
 
@@ -354,9 +357,8 @@ class AliceBlue:
         heart_beat = {"a": "h", "v": [], "m": ""}
         while True:
             sleep(5)
-            with self.__ws_mutex:
-                self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
-    
+            self.__ws_send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
+
     def __ws_run_forever(self):
         while True:
             try:
@@ -364,6 +366,13 @@ class AliceBlue:
             except Exception as e:
                 logging.info(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
+
+    def __ws_send(self, *args, **kwargs):
+        while self.__websocket_connected == False:
+            sleep(0.05)  # sleep for 50ms if websocket is not connected, wait for reconnection
+        with self.__ws_mutex:
+            ret = self.__websocket.send(*args, **kwargs)
+        return ret
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -663,9 +672,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'subscribe', 'v' : arr, 'm' : mode})
-        with self.__ws_mutex:
-            ret = self.__websocket.send(data)
-        return ret
+        return self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
@@ -694,9 +701,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'unsubscribe', 'v' : arr, 'm' : mode})
-        with self.__ws_mutex:
-            ret = self.__websocket.send(data)
-        return ret
+        return self.__ws_send(data)
 
     def get_all_subscriptions(self):
         """ get the current feed of an instrument """
