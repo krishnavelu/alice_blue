@@ -757,7 +757,7 @@ class AliceBlue:
             return None
         master_contract = self.__master_contracts_by_token[exchange]
         for contract in master_contract:
-            if symbol in master_contract[contract].symbol:
+            if symbol == master_contract[contract].symbol.split(' ')[0]:
                 matches.append(master_contract[contract])
         return matches
 
