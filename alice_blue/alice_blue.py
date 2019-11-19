@@ -476,7 +476,7 @@ class AliceBlue:
         elif(product_type == ProductType.CoverOrder):
             product_type = 'CO'
         elif(product_type == ProductType.BracketOrder):
-            product_type = None
+            prod_type = None
         # construct order object after all required parameters are met
         order = {  'exchange': instrument.exchange,
                    'order_type': order_type.value,
@@ -487,7 +487,7 @@ class AliceBlue:
                    'transaction_type':transaction_type.value,
                    'trigger_price':trigger_price,
                    'validity':'DAY',
-                   'product':product_type,
+                   'product':prod_type,
                    'source':'web',
                    'order_tag': 'order1'}
 
@@ -510,6 +510,11 @@ class AliceBlue:
             if not isinstance(trigger_price, float):
                 raise TypeError("Required parameter trigger_price not of type float")
 
+        if(is_amo == True):
+            helper = 'place_amo'
+        else:
+            helper = 'place_order'
+
         if product_type is ProductType.BracketOrder:
             helper = 'place_bracket_order'
             del order['product'] 
@@ -519,10 +524,6 @@ class AliceBlue:
             if not isinstance(square_off, float):
                 raise TypeError("Required parameter square_off not of type float")
             
-        if(is_amo == True):
-            helper = 'place_amo'
-        else:
-            helper = 'place_order'
         return self.__api_call_helper(helper, Requests.POST, None, order)
 
     def place_basket_order(self, orders):
