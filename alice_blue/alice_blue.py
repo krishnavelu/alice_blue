@@ -467,14 +467,14 @@ class AliceBlue:
             raise TypeError("Optional parameter trigger_price not of type float")
 
         if(product_type == ProductType.Intraday):
-            product_type = 'MIS'
+            prod_type = 'MIS'
         elif(product_type == ProductType.Delivery):
             if(instrument.exchange == 'NFO'):
-                product_type = 'NRML'
+                prod_type = 'NRML'
             else:
-                product_type = 'CNC'
+                prod_type = 'CNC'
         elif(product_type == ProductType.CoverOrder):
-            product_type = 'CO'
+            prod_type = 'CO'
         elif(product_type == ProductType.BracketOrder):
             prod_type = None
         # construct order object after all required parameters are met
