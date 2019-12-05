@@ -163,6 +163,7 @@ class AliceBlue:
           'get_order_info': '/api/v2/order/{order_id}',
           'modify_order': '/api/v2/order',
           'cancel_order': '/api/v2/order?oms_order_id={order_id}&order_status=open',
+		  'cancel_cover_order': "/api/v2/coverorder?oms_order_id={order_id}&leg_order_indicator={leg_order_id}",
           'trade_book': '/api/v2/trade',
           'scripinfo': '/api/v2/scripinfo?exchange={exchange}&instrument_token={token}',
       },
@@ -571,6 +572,9 @@ class AliceBlue:
     def cancel_order(self, order_id):
         return self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
 
+	def cancel_cover_order(self, order_id, leg_order_id):
+        return self.__api_call_helper('cancel_cover_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id':leg_order_id}, None)
+					 
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
