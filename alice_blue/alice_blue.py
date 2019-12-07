@@ -175,6 +175,7 @@ class AliceBlue:
         self.__username = username
         self.__password = password
         self.__websocket = None
+        self.__websocket_connected = False
         self.__ws_mutex = threading.Lock()
         self.__on_error = None
         self.__on_disconnect = None
@@ -337,10 +338,12 @@ class AliceBlue:
             return
          
     def __on_close_callback(self, ws=None):
+        self.__websocket_connected = False
         if self.__on_disconnect:
             self.__on_disconnect()
 
     def __on_open_callback(self, ws=None):
+        self.__websocket_connected = True
         if self.__on_open:
             self.__on_open()
 
@@ -354,9 +357,8 @@ class AliceBlue:
         heart_beat = {"a": "h", "v": [], "m": ""}
         while True:
             sleep(5)
-            with self.__ws_mutex:
-                self.__websocket.send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
-    
+            self.__ws_send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
+
     def __ws_run_forever(self):
         while True:
             try:
@@ -364,6 +366,13 @@ class AliceBlue:
             except Exception as e:
                 logging.info(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
+
+    def __ws_send(self, *args, **kwargs):
+        while self.__websocket_connected == False:
+            sleep(0.05)  # sleep for 50ms if websocket is not connected, wait for reconnection
+        with self.__ws_mutex:
+            ret = self.__websocket.send(*args, **kwargs)
+        return ret
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -391,7 +400,7 @@ class AliceBlue:
             self.__ws_thread.daemon = True
             self.__ws_thread.start()
         else:
-            self.__ws_run_forever
+            self.__ws_run_forever()
 
     def get_profile(self):
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
@@ -458,16 +467,16 @@ class AliceBlue:
             raise TypeError("Optional parameter trigger_price not of type float")
 
         if(product_type == ProductType.Intraday):
-            product_type = 'MIS'
+            prod_type = 'MIS'
         elif(product_type == ProductType.Delivery):
             if(instrument.exchange == 'NFO'):
-                product_type = 'NRML'
+                prod_type = 'NRML'
             else:
-                product_type = 'CNC'
+                prod_type = 'CNC'
         elif(product_type == ProductType.CoverOrder):
-            product_type = 'CO'
+            prod_type = 'CO'
         elif(product_type == ProductType.BracketOrder):
-            product_type = None
+            prod_type = None
         # construct order object after all required parameters are met
         order = {  'exchange': instrument.exchange,
                    'order_type': order_type.value,
@@ -478,7 +487,7 @@ class AliceBlue:
                    'transaction_type':transaction_type.value,
                    'trigger_price':trigger_price,
                    'validity':'DAY',
-                   'product':product_type,
+                   'product':prod_type,
                    'source':'web',
                    'order_tag': 'order1'}
 
@@ -501,6 +510,11 @@ class AliceBlue:
             if not isinstance(trigger_price, float):
                 raise TypeError("Required parameter trigger_price not of type float")
 
+        if(is_amo == True):
+            helper = 'place_amo'
+        else:
+            helper = 'place_order'
+
         if product_type is ProductType.BracketOrder:
             helper = 'place_bracket_order'
             del order['product'] 
@@ -510,11 +524,72 @@ class AliceBlue:
             if not isinstance(square_off, float):
                 raise TypeError("Required parameter square_off not of type float")
             
-        if(is_amo == True):
-            helper = 'place_amo'
-        else:
-            helper = 'place_order'
         return self.__api_call_helper(helper, Requests.POST, None, order)
+
+    def place_basket_order(self, orders):
+        """ placing a basket order, 
+            Argument orders should be a list of all orders that should be sent
+            each element in order should be a dictionary containing the following key.
+            "instrument", "order_type", "quantity", "price" (only if its a limit order), 
+            "transaction_type", "product_type"
+        """
+        keys = {"instrument"        : Instrument, 
+                "order_type"        : OrderType, 
+                "quantity"          : int,
+                "transaction_type"  : TransactionType,
+                "product_type"      : ProductType}
+        if not isinstance(orders, list):
+            raise TypeError("Required parameter orders is not of type list")
+
+        if len(orders) <= 0:
+            raise TypeError("Length of orders should be greater than 0")
+
+        for i in orders:
+            if not isinstance(i, dict):
+                raise TypeError("Each element in orders should be of type dict")
+            for s in keys:
+                if s not in i:
+                    raise TypeError(f"Each element in orders should have key {s}")
+                if type(i[s]) is not keys[s]:  
+                    raise TypeError(f"Element '{s}' in orders should be of type {keys[s]}")
+            if i['order_type'] == OrderType.Limit:
+                if "price" not in i:
+                    raise TypeError("Each element in orders should have key 'price' if its a limit order ")
+                if isinstance(i['price'], float):
+                    raise TypeError("Element price in orders should be of type float")
+            else:
+                i['price'] = 0.0
+            if(i['product_type'] == ProductType.Intraday):
+                i['product_type'] = 'MIS'
+            elif(i['product_type'] == ProductType.Delivery):
+                if(i['instrument'].exchange == 'NFO'):
+                    i['product_type'] = 'NRML'
+                else:
+                    i['product_type'] = 'CNC'
+            elif(i['product_type'] == ProductType.CoverOrder):
+                raise TypeError("Product Type BO or CO is not supported in basket order")
+            elif(i['product_type'] == ProductType.BracketOrder):
+                raise TypeError("Product Type BO or CO is not supported in basket order")
+            if i['quantity'] <= 0:
+                raise TypeError("Quantity should be greater than 0")
+
+        data = {'source':'web',
+                'orders' : []}
+        for i in orders:
+            # construct order object after all required parameters are met
+            data['orders'].append({'exchange'           : i['instrument'].exchange,
+                                   'order_type'         : i['order_type'].value,
+                                   'instrument_token'   : i['instrument'].token,
+                                   'quantity'           : i['quantity'],
+                                   'disclosed_quantity' : 0,
+                                   'price'              : i['price'],
+                                   'transaction_type'   : i['transaction_type'].value,
+                                   'trigger_price'      : 0,
+                                   'validity'           : 'DAY',
+                                   'product'            : i['product_type']})
+
+        helper = 'place_basket_order'
+        return self.__api_call_helper(helper, Requests.POST, None, data)
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity=None, price=0.0,
                      trigger_price=0.0):
@@ -598,9 +673,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'subscribe', 'v' : arr, 'm' : mode})
-        with self.__ws_mutex:
-            ret = self.__websocket.send(data)
-        return ret
+        return self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
@@ -629,9 +702,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'unsubscribe', 'v' : arr, 'm' : mode})
-        with self.__ws_mutex:
-            ret = self.__websocket.send(data)
-        return ret
+        return self.__ws_send(data)
 
     def get_all_subscriptions(self):
         """ get the current feed of an instrument """
@@ -687,7 +758,7 @@ class AliceBlue:
             return None
         master_contract = self.__master_contracts_by_token[exchange]
         for contract in master_contract:
-            if symbol in master_contract[contract].symbol:
+            if symbol == master_contract[contract].symbol.split(' ')[0]:
                 matches.append(master_contract[contract])
         return matches
 

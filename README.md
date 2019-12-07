@@ -419,10 +419,45 @@ print(
 )
 ```
 
+### Place basket order
+Basket order is used to buy or sell group of securities simultaneously.
+```python
+order1 = {  "instrument"        : alice.get_instrument_by_symbol('NSE', 'INFY'),
+            "order_type"        : OrderType.Market,
+            "quantity"          : 1,
+            "transaction_type"  : TransactionType.Buy,
+            "product_type"      : ProductType.Delivery}
+order2 = {  "instrument"        : alice.get_instrument_by_symbol('NSE', 'SBIN'),
+            "order_type"        : OrderType.Limit,
+            "quantity"          : 2,
+            "price"             : 280.0,
+            "transaction_type"  : TransactionType.Sell,
+            "product_type"      : ProductType.Intraday}
+order = [order1, order2]
+print(alice.place_basket_order(orders))
+```
+
 ### Cancel an order
 
 ```python
 alice.cancel_order('170713000075481') #Cancel an open order
+```
+
+### Getting order history and trade details
+
+#### Get order history of a particular order
+```python
+print(alice.get_order_history('170713000075481'))
+```
+
+#### Get order history of all orders.
+```python
+print(alice.get_order_history())
+```
+
+#### Get trade book
+```python
+print(alice.get_trade_book())
 ```
 
 ### Order properties as enums
