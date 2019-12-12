@@ -739,7 +739,7 @@ class AliceBlue:
             else:
                 sp = i.symbol.split(' ')
                 if((sp[-1] == 'CE') or (sp[-1] == 'PE')):           # Only option scrips 
-                    if(sp[-2] == str(strike)):
+                    if(float(sp[-2]) == float(strike)):
                         if(is_CE == True):
                             if(sp[-1] == 'CE'):
                                 return i
