@@ -288,7 +288,7 @@ class AliceBlue:
         return dictionary
 
     def __convert_instrument(self, dictionary):
-        dictionary['instrument'] = self.get_instrument_by_token( dictionary['token'])
+        dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
         return dictionary
         
     def __modify_human_readable_values(self, dictionary):
@@ -657,13 +657,13 @@ class AliceBlue:
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
                 arr.append([exchange, int(_instrument.token)])
-                self.__subscribers[_instrument.token] = live_feed_type
+                self.__subscribers[_instrument] = live_feed_type
         else:
             if not isinstance(instrument, Instrument):
                 raise TypeError("Required parameter instrument not of type Instrument")
             exchange = self.__exchange_codes[instrument.exchange]
             arr = [[exchange, int(instrument.token)]]
-            self.__subscribers[instrument.token] = live_feed_type
+            self.__subscribers[instrument] = live_feed_type
         if(live_feed_type == LiveFeedType.MARKET_DATA):
             mode = 'marketdata' 
         elif(live_feed_type == LiveFeedType.COMPACT):
@@ -686,13 +686,13 @@ class AliceBlue:
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
                 arr.append([exchange, int(_instrument.token)])
-                if(_instrument.token in self.__subscribers): del self.__subscribers[_instrument.token]
+                if(_instrument in self.__subscribers): del self.__subscribers[_instrument]
         else:
             if not isinstance(instrument, Instrument):
                 raise TypeError("Required parameter instrument not of type Instrument")
             exchange = self.__exchange_codes[instrument.exchange]
             arr = [[exchange, int(instrument.token)]]
-            if(instrument.token in self.__subscribers): del self.__subscribers[instrument.token]
+            if(instrument in self.__subscribers): del self.__subscribers[instrument]
         if(live_feed_type == LiveFeedType.MARKET_DATA):
             mode = 'marketdata' 
         elif(live_feed_type == LiveFeedType.COMPACT):
@@ -706,15 +706,12 @@ class AliceBlue:
 
     def get_all_subscriptions(self):
         """ get the current feed of an instrument """
-        res = {}
-        for key, value in self.__subscribers.items():
-            ins = self.get_instrument_by_token(key)
-            res[ins] = value
-        return res
+        return self.__subscribers
 
     def get_instrument_by_symbol(self, exchange, symbol):
         # get instrument given exchange and symbol
         exchange = exchange.upper()
+        symbol = symbol.upper()
         # check if master contract exists
         if exchange not in self.__master_contracts_by_symbol:
             logging.warning(f"Cannot find exchange {exchange} in master contract. "
@@ -762,14 +759,20 @@ class AliceBlue:
                 matches.append(master_contract[contract])
         return matches
 
-    def get_instrument_by_token(self, token):
-        if(type(token) is int):
-            token = str(token)
-        for _, lst in self.__master_contracts_by_token.items():
-            for key, value in lst.items():
-                if token == key:
-                    return value
-        return None
+    def get_instrument_by_token(self, exchange, token):
+        # get instrument given exchange and token
+        exchange = exchange.upper()
+        token = int(token)
+        # check if master contract exists
+        if exchange not in self.__master_contracts_by_symbol:
+            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+                            "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
+            return None
+        master_contract = self.__master_contracts_by_token[exchange]
+        if token not in master_contract:
+            logging.warning(f"Cannot find symbol {exchange} {token} in master contract")
+            return None
+        return master_contract[token]
 
     def get_master_contract(self, exchange):
         return self.__master_contracts_by_symbol[exchange]
@@ -785,7 +788,7 @@ class AliceBlue:
         for sub in body:
             for scrip in body[sub]:
                 # convert token
-                token = scrip['code']
+                token = int(scrip['code'])
     
                 # convert symbol to upper
                 symbol = scrip['symbol']
