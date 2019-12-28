@@ -114,9 +114,9 @@ sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'Sensex')
 
 Search for a single instrument by it's token number (generally useful only for BSE Equities):
 ```python
-ongc_bse_eq = alice.get_instrument_by_token(500312)
-reliance_bse_eq = alice.get_instrument_by_token(500325)
-acc_nse_eq = alice.get_instrument_by_token(22)
+ongc_bse_eq = alice.get_instrument_by_token('BSE', 500312)
+reliance_bse_eq = alice.get_instrument_by_token('BSE', 500325)
+acc_nse_eq = alice.get_instrument_by_token('NSE', 22)
 ```
 
 Search for multiple instruments by matching the name
