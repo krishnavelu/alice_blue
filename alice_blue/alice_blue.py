@@ -711,7 +711,6 @@ class AliceBlue:
     def get_instrument_by_symbol(self, exchange, symbol):
         # get instrument given exchange and symbol
         exchange = exchange.upper()
-        symbol = symbol.upper()
         # check if master contract exists
         if exchange not in self.__master_contracts_by_symbol:
             logging.warning(f"Cannot find exchange {exchange} in master contract. "
