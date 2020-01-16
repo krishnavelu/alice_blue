@@ -28,7 +28,7 @@ class OrderType(enum.Enum):
     Market = 'MARKET'
     Limit = 'LIMIT'
     StopLossLimit = 'SL'
-    StopLossMarket = 'SLM'
+    StopLossMarket = 'SL-M'
 
 class ProductType(enum.Enum):
     Intraday = 'I'
