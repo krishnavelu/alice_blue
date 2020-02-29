@@ -595,8 +595,8 @@ class AliceBlue:
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity=None, price=0.0,
                      trigger_price=0.0):
-        """ modify an order, only order id is required, rest are optional, use only when
-            when you want to change that attribute
+        """ modify an order, transaction_type, instrument, product_type, order_id & order_type is required, 
+            rest are optional, use only when when you want to change that attribute.
         """
         if not isinstance(instrument, Instrument):
             raise TypeError("Required parameter instrument not of type Instrument")
