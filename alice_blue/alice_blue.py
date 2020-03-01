@@ -222,7 +222,8 @@ class AliceBlue:
         #Get the Code
         r = requests.Session()
         config = AliceBlue.__service_config
-        resp = r.get(f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}")
+        url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}" 
+        resp = r.get(url)
         if('OAuth 2.0 Error' in resp.text):
             logging.info("OAuth 2.0 Error occurred. Please verify your api_secret")
             return None
@@ -246,6 +247,14 @@ class AliceBlue:
             question_ids.append(i['value'])
         logging.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
         resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
+        if('consent_challenge' in resp.url):
+            logging.info("Authorizing app for the first time")
+            page = BeautifulSoup(resp.text, features="html.parser")
+            csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
+            resp = r.post(url=resp.url,data={'_csrf_token':csrf_token, 'consent': "Authorize", "scopes": ""})
+            if('Internal server error' in resp.text):
+                logging.warn(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
+                return
         code = resp.url[resp.url.index('=')+1:resp.url.index('&')]
 
         #Get Access Token
