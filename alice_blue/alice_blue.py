@@ -664,6 +664,13 @@ class AliceBlue:
             ret = self.__api_call_helper('cancel_bo_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
         return ret
 
+    def cancel_all_orders(self):
+        orders = self.get_order_history()['data']
+        if not orders:
+            return
+        for c_order in orders['pending_orders']:
+            self.cancel_order(c_order['oms_order_id'])
+        
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
