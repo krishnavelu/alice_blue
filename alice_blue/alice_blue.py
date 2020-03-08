@@ -661,7 +661,7 @@ class AliceBlue:
             else:
                 ret = self.__api_call_helper('cancel_bo_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
         else:
-            ret = self.__api_call_helper('cancel_bo_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
+            ret = self.__api_call_helper('cancel_co_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
         return ret
 
     def cancel_all_orders(self):
