@@ -13,6 +13,7 @@ from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
+logger = logging.getLogger(__name__)
 
 class Requests(enum.Enum):
     PUT = 1
@@ -204,7 +205,7 @@ class AliceBlue:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         if(profile['status'] == 'error'):
             if(profile['message'] == 'Not able to retrieve AccountInfoService'):     # Don't know why this error comes, but it safe to proceed further.
-                logging.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
+                logger.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
             else:
                 raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
@@ -225,35 +226,35 @@ class AliceBlue:
         url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}" 
         resp = r.get(url)
         if('OAuth 2.0 Error' in resp.text):
-            logging.info("OAuth 2.0 Error occurred. Please verify your api_secret")
+            logger.info("OAuth 2.0 Error occurred. Please verify your api_secret")
             return None
         page = BeautifulSoup(resp.text, features="html.parser")
         csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
         login_challenge = page.find('input', attrs = {'name' : 'login_challenge'})['value']
         resp = r.post(resp.url,data={'client_id':username,'password':password,'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('Please Enter Valid Password' in resp.text):
-            logging.info("Please enter a valid password")
+            logger.info("Please enter a valid password")
             return
         if('Internal server error' in resp.text):
-            logging.info("Got Internal server error, please try again after sometimes")
+            logger.info("Got Internal server error, please try again after sometimes")
             return
         question_ids = []
         page = BeautifulSoup(resp.text, features="html.parser")
         err = page.find('p', attrs={'class':'error'})
         if(len(err) > 0):
-            logging.info(f"Couldn't login {err}")
+            logger.info(f"Couldn't login {err}")
             return
         for i in page.find_all('input', attrs={'name':'question_id1'}):
             question_ids.append(i['value'])
-        logging.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
+        logger.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
         resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('consent_challenge' in resp.url):
-            logging.info("Authorizing app for the first time")
+            logger.info("Authorizing app for the first time")
             page = BeautifulSoup(resp.text, features="html.parser")
             csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
             resp = r.post(url=resp.url,data={'_csrf_token':csrf_token, 'consent': "Authorize", "scopes": ""})
             if('Internal server error' in resp.text):
-                logging.warn(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
+                logger.warn(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
                 return
         code = resp.url[resp.url.index('=')+1:resp.url.index('&')]
 
@@ -264,10 +265,10 @@ class AliceBlue:
         resp = json.loads(resp.text)
         if('access_token' in resp):
             access_token = resp['access_token']
-            logging.info(f'access_token - {access_token}')
+            logger.info(f'access_token - {access_token}')
             return access_token
         else:
-            logging.info(f"Couldn't get access token {resp}")
+            logger.info(f"Couldn't get access token {resp}")
         return None
 
     def __convert_prices(self, dictionary, multiplier):
@@ -338,12 +339,12 @@ class AliceBlue:
             p = OpenInterest.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
         elif(message[0] == WsFrameMode.MARKET_STATUS):
-            logging.info(f"market status {message}")
+            logger.info(f"market status {message}")
 #             p = MarketStatus.parse(message[1:]).__dict__
 #             res = self.__modify_human_readable_values(p) 
             return
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            logging.info(f"exchange message {message}")
+            logger.info(f"exchange message {message}")
 #             p = ExchangeMessage.parse(message[1:]).__dict__
 #             res = self.__modify_human_readable_values(p) 
             return
@@ -375,7 +376,7 @@ class AliceBlue:
             try:
                 self.__websocket.run_forever()
             except Exception as e:
-                logging.info(f"websocket run forever ended in exception, {e}")
+                logger.info(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
 
     def __ws_send(self, *args, **kwargs):
@@ -738,12 +739,12 @@ class AliceBlue:
         exchange = exchange.upper()
         # check if master contract exists
         if exchange not in self.__master_contracts_by_symbol:
-            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
                             "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
             return None
         master_contract = self.__master_contracts_by_symbol[exchange]
         if symbol not in master_contract:
-            logging.warning(f"Cannot find symbol {exchange} {symbol} in master contract")
+            logger.warning(f"Cannot find symbol {exchange} {symbol} in master contract")
             return None
         return master_contract[symbol]
     
@@ -774,7 +775,7 @@ class AliceBlue:
         matches = []
         # check if master contract exists
         if exchange not in self.__master_contracts_by_token:
-            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
                 "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
             return None
         master_contract = self.__master_contracts_by_token[exchange]
@@ -789,12 +790,12 @@ class AliceBlue:
         token = int(token)
         # check if master contract exists
         if exchange not in self.__master_contracts_by_symbol:
-            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
                             "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
             return None
         master_contract = self.__master_contracts_by_token[exchange]
         if token not in master_contract:
-            logging.warning(f"Cannot find symbol {exchange} {token} in master contract")
+            logger.warning(f"Cannot find symbol {exchange} {token} in master contract")
             return None
         return master_contract[token]
 
@@ -805,7 +806,7 @@ class AliceBlue:
         """ returns all the tradable contracts of an exchange
             placed in an OrderedDict and the key is the token
         """
-        logging.debug(f'Downloading master contracts for exchange: {exchange}')
+        logger.debug(f'Downloading master contracts for exchange: {exchange}')
         body = self.__api_call_helper('master_contract', Requests.GET, {'exchange': exchange}, None)
         master_contract_by_token = OrderedDict()
         master_contract_by_symbol = OrderedDict()
@@ -851,7 +852,7 @@ class AliceBlue:
         return json.loads(response.text)
 
     def __api_call(self, url, http_method, data):
-        #logging.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
+        #logger.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
         headers = {"Content-Type": "application/json"} 
         if(len(self.__access_token) > 100):
             headers['X-Authorization-Token'] = self.__access_token
