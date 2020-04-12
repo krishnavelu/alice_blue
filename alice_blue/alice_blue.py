@@ -226,23 +226,23 @@ class AliceBlue:
         url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}" 
         resp = r.get(url)
         if('OAuth 2.0 Error' in resp.text):
-            logger.info("OAuth 2.0 Error occurred. Please verify your api_secret")
+            logger.error("OAuth 2.0 Error occurred. Please verify your api_secret")
             return None
         page = BeautifulSoup(resp.text, features="html.parser")
         csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
         login_challenge = page.find('input', attrs = {'name' : 'login_challenge'})['value']
         resp = r.post(resp.url,data={'client_id':username,'password':password,'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('Please Enter Valid Password' in resp.text):
-            logger.info("Please enter a valid password")
+            logger.error("Please enter a valid password")
             return
         if('Internal server error' in resp.text):
-            logger.info("Got Internal server error, please try again after sometimes")
+            logger.error("Got Internal server error, please try again after sometimes")
             return
         question_ids = []
         page = BeautifulSoup(resp.text, features="html.parser")
         err = page.find('p', attrs={'class':'error'})
         if(len(err) > 0):
-            logger.info(f"Couldn't login {err}")
+            logger.error(f"Couldn't login {err}")
             return
         for i in page.find_all('input', attrs={'name':'question_id1'}):
             question_ids.append(i['value'])
@@ -254,7 +254,7 @@ class AliceBlue:
             csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
             resp = r.post(url=resp.url,data={'_csrf_token':csrf_token, 'consent': "Authorize", "scopes": ""})
             if('Internal server error' in resp.text):
-                logger.warn(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
+                logger.error(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
                 return
         code = resp.url[resp.url.index('=')+1:resp.url.index('&')]
 
@@ -268,7 +268,7 @@ class AliceBlue:
             logger.info(f'access_token - {access_token}')
             return access_token
         else:
-            logger.info(f"Couldn't get access token {resp}")
+            logger.error(f"Couldn't get access token {resp}")
         return None
 
     def __convert_prices(self, dictionary, multiplier):
@@ -376,7 +376,7 @@ class AliceBlue:
             try:
                 self.__websocket.run_forever()
             except Exception as e:
-                logger.info(f"websocket run forever ended in exception, {e}")
+                logger.warning(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
 
     def __ws_send(self, *args, **kwargs):
@@ -806,7 +806,7 @@ class AliceBlue:
         """ returns all the tradable contracts of an exchange
             placed in an OrderedDict and the key is the token
         """
-        logger.debug(f'Downloading master contracts for exchange: {exchange}')
+        logger.info(f'Downloading master contracts for exchange: {exchange}')
         body = self.__api_call_helper('master_contract', Requests.GET, {'exchange': exchange}, None)
         master_contract_by_token = OrderedDict()
         master_contract_by_symbol = OrderedDict()
