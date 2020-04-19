@@ -453,7 +453,8 @@ class AliceBlue:
     def place_order(self, transaction_type, instrument, quantity, order_type,
                     product_type, price=0.0, trigger_price=None,
                     stop_loss=None, square_off=None, trailing_sl=None,
-                    is_amo = False):
+                    is_amo = False,
+                    order_tag = 'order1'):
         """ placing an order, many fields are optional and are not required
             for all order types
         """
@@ -501,7 +502,7 @@ class AliceBlue:
                    'validity':'DAY',
                    'product':prod_type,
                    'source':'web',
-                   'order_tag': 'order1'}
+                   'order_tag': order_tag}
 
         if stop_loss is not None and not isinstance(stop_loss, float):
             raise TypeError("Optional parameter stop_loss not of type float")
