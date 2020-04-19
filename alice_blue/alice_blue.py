@@ -219,11 +219,13 @@ class AliceBlue:
         self.ws_thread = None
 
     @staticmethod
-    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback'):
+    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
         #Get the Code
+        if(app_id is None):
+            app_id = username
         r = requests.Session()
         config = AliceBlue.__service_config
-        url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}" 
+        url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={app_id}&redirect_uri={redirect_url}" 
         resp = r.get(url)
         if('OAuth 2.0 Error' in resp.text):
             logger.error("OAuth 2.0 Error occurred. Please verify your api_secret")
@@ -260,8 +262,8 @@ class AliceBlue:
 
         #Get Access Token
         params = {'code': code, 'redirect_uri': redirect_url, 'grant_type': 'authorization_code', 'client_secret' : api_secret, "cliend_id": username}
-        url = f"{config['host']}{config['routes']['access_token']}?client_id={username}&client_secret={api_secret}&grant_type=authorization_code&code={code}&redirect_uri={redirect_url}&authorization_response=authorization_response"
-        resp = r.post(url,auth=(username, api_secret),data=params)
+        url = f"{config['host']}{config['routes']['access_token']}?client_id={app_id}&client_secret={api_secret}&grant_type=authorization_code&code={code}&redirect_uri={redirect_url}&authorization_response={resp.url}"
+        resp = r.post(url,auth=(app_id, api_secret),data=params)
         resp = json.loads(resp.text)
         if('access_token' in resp):
             access_token = resp['access_token']
