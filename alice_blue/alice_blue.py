@@ -13,6 +13,7 @@ from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
+logger = logging.getLogger(__name__)
 
 class Requests(enum.Enum):
     PUT = 1
@@ -28,7 +29,7 @@ class OrderType(enum.Enum):
     Market = 'MARKET'
     Limit = 'LIMIT'
     StopLossLimit = 'SL'
-    StopLossMarket = 'SLM'
+    StopLossMarket = 'SL-M'
 
 class ProductType(enum.Enum):
     Intraday = 'I'
@@ -163,6 +164,8 @@ class AliceBlue:
           'get_order_info': '/api/v2/order/{order_id}',
           'modify_order': '/api/v2/order',
           'cancel_order': '/api/v2/order?oms_order_id={order_id}&order_status=open',
+          'cancel_bo_order': '/api/v2/order?oms_order_id={order_id}&order_status=open&leg_order_indicator={leg_order_id}',
+          'cancel_co_order': '/api/v2/coverorder?oms_order_id={order_id}&order_status=open&leg_order_indicator={leg_order_id}',
           'trade_book': '/api/v2/trade',
           'scripinfo': '/api/v2/scripinfo?exchange={exchange}&instrument_token={token}',
       },
@@ -202,7 +205,7 @@ class AliceBlue:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         if(profile['status'] == 'error'):
             if(profile['message'] == 'Not able to retrieve AccountInfoService'):     # Don't know why this error comes, but it safe to proceed further.
-                logging.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
+                logger.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
             else:
                 raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
@@ -216,47 +219,58 @@ class AliceBlue:
         self.ws_thread = None
 
     @staticmethod
-    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback'):
+    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
         #Get the Code
+        if(app_id is None):
+            app_id = username
         r = requests.Session()
         config = AliceBlue.__service_config
-        resp = r.get(f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={username}&redirect_uri={redirect_url}")
+        url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={app_id}&redirect_uri={redirect_url}" 
+        resp = r.get(url)
         if('OAuth 2.0 Error' in resp.text):
-            logging.info("OAuth 2.0 Error occurred. Please verify your api_secret")
+            logger.error("OAuth 2.0 Error occurred. Please verify your api_secret")
             return None
         page = BeautifulSoup(resp.text, features="html.parser")
         csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
         login_challenge = page.find('input', attrs = {'name' : 'login_challenge'})['value']
         resp = r.post(resp.url,data={'client_id':username,'password':password,'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('Please Enter Valid Password' in resp.text):
-            logging.info("Please enter a valid password")
+            logger.error("Please enter a valid password")
             return
         if('Internal server error' in resp.text):
-            logging.info("Got Internal server error, please try again after sometimes")
+            logger.error("Got Internal server error, please try again after sometimes")
             return
         question_ids = []
         page = BeautifulSoup(resp.text, features="html.parser")
         err = page.find('p', attrs={'class':'error'})
         if(len(err) > 0):
-            logging.info(f"Couldn't login {err}")
+            logger.error(f"Couldn't login {err}")
             return
         for i in page.find_all('input', attrs={'name':'question_id1'}):
             question_ids.append(i['value'])
-        logging.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
+        logger.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
         resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
+        if('consent_challenge' in resp.url):
+            logger.info("Authorizing app for the first time")
+            page = BeautifulSoup(resp.text, features="html.parser")
+            csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
+            resp = r.post(url=resp.url,data={'_csrf_token':csrf_token, 'consent': "Authorize", "scopes": ""})
+            if('Internal server error' in resp.text):
+                logger.error(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
+                return
         code = resp.url[resp.url.index('=')+1:resp.url.index('&')]
 
         #Get Access Token
         params = {'code': code, 'redirect_uri': redirect_url, 'grant_type': 'authorization_code', 'client_secret' : api_secret, "cliend_id": username}
-        url = f"{config['host']}{config['routes']['access_token']}?client_id={username}&client_secret={api_secret}&grant_type=authorization_code&code={code}&redirect_uri={redirect_url}&authorization_response=authorization_response"
-        resp = r.post(url,auth=(username, api_secret),data=params)
+        url = f"{config['host']}{config['routes']['access_token']}?client_id={app_id}&client_secret={api_secret}&grant_type=authorization_code&code={code}&redirect_uri={redirect_url}&authorization_response={resp.url}"
+        resp = r.post(url,auth=(app_id, api_secret),data=params)
         resp = json.loads(resp.text)
         if('access_token' in resp):
             access_token = resp['access_token']
-            logging.info(f'access_token - {access_token}')
+            logger.info(f'access_token - {access_token}')
             return access_token
         else:
-            logging.info(f"Couldn't get access token {resp}")
+            logger.error(f"Couldn't get access token {resp}")
         return None
 
     def __convert_prices(self, dictionary, multiplier):
@@ -288,7 +302,7 @@ class AliceBlue:
         return dictionary
 
     def __convert_instrument(self, dictionary):
-        dictionary['instrument'] = self.get_instrument_by_token( dictionary['token'])
+        dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
         return dictionary
         
     def __modify_human_readable_values(self, dictionary):
@@ -327,12 +341,12 @@ class AliceBlue:
             p = OpenInterest.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
         elif(message[0] == WsFrameMode.MARKET_STATUS):
-            logging.info(f"market status {message}")
+            logger.info(f"market status {message}")
 #             p = MarketStatus.parse(message[1:]).__dict__
 #             res = self.__modify_human_readable_values(p) 
             return
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            logging.info(f"exchange message {message}")
+            logger.info(f"exchange message {message}")
 #             p = ExchangeMessage.parse(message[1:]).__dict__
 #             res = self.__modify_human_readable_values(p) 
             return
@@ -364,7 +378,7 @@ class AliceBlue:
             try:
                 self.__websocket.run_forever()
             except Exception as e:
-                logging.info(f"websocket run forever ended in exception, {e}")
+                logger.warning(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
 
     def __ws_send(self, *args, **kwargs):
@@ -441,7 +455,8 @@ class AliceBlue:
     def place_order(self, transaction_type, instrument, quantity, order_type,
                     product_type, price=0.0, trigger_price=None,
                     stop_loss=None, square_off=None, trailing_sl=None,
-                    is_amo = False):
+                    is_amo = False,
+                    order_tag = 'order1'):
         """ placing an order, many fields are optional and are not required
             for all order types
         """
@@ -469,7 +484,7 @@ class AliceBlue:
         if(product_type == ProductType.Intraday):
             prod_type = 'MIS'
         elif(product_type == ProductType.Delivery):
-            if(instrument.exchange == 'NFO'):
+            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX'):
                 prod_type = 'NRML'
             else:
                 prod_type = 'CNC'
@@ -489,7 +504,7 @@ class AliceBlue:
                    'validity':'DAY',
                    'product':prod_type,
                    'source':'web',
-                   'order_tag': 'order1'}
+                   'order_tag': order_tag}
 
         if stop_loss is not None and not isinstance(stop_loss, float):
             raise TypeError("Optional parameter stop_loss not of type float")
@@ -593,8 +608,8 @@ class AliceBlue:
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity=None, price=0.0,
                      trigger_price=0.0):
-        """ modify an order, only order id is required, rest are optional, use only when
-            when you want to change that attribute
+        """ modify an order, transaction_type, instrument, product_type, order_id & order_type is required, 
+            rest are optional, use only when when you want to change that attribute.
         """
         if not isinstance(instrument, Instrument):
             raise TypeError("Required parameter instrument not of type Instrument")
@@ -643,9 +658,23 @@ class AliceBlue:
                    'nest_request_id' : '1'}
         return self.__api_call_helper('modify_order', Requests.PUT, None, order)
 
-    def cancel_order(self, order_id):
-        return self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
+    def cancel_order(self, order_id, leg_order_id=None, is_co=False):
+        if(is_co == False):
+            if(leg_order_id == None):
+                ret = self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
+            else:
+                ret = self.__api_call_helper('cancel_bo_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
+        else:
+            ret = self.__api_call_helper('cancel_co_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
+        return ret
 
+    def cancel_all_orders(self):
+        orders = self.get_order_history()['data']
+        if not orders:
+            return
+        for c_order in orders['pending_orders']:
+            self.cancel_order(c_order['oms_order_id'])
+        
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
@@ -657,13 +686,13 @@ class AliceBlue:
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
                 arr.append([exchange, int(_instrument.token)])
-                self.__subscribers[_instrument.token] = live_feed_type
+                self.__subscribers[_instrument] = live_feed_type
         else:
             if not isinstance(instrument, Instrument):
                 raise TypeError("Required parameter instrument not of type Instrument")
             exchange = self.__exchange_codes[instrument.exchange]
             arr = [[exchange, int(instrument.token)]]
-            self.__subscribers[instrument.token] = live_feed_type
+            self.__subscribers[instrument] = live_feed_type
         if(live_feed_type == LiveFeedType.MARKET_DATA):
             mode = 'marketdata' 
         elif(live_feed_type == LiveFeedType.COMPACT):
@@ -686,13 +715,13 @@ class AliceBlue:
                     raise TypeError("Required parameter instrument not of type Instrument")
                 exchange = self.__exchange_codes[_instrument.exchange] 
                 arr.append([exchange, int(_instrument.token)])
-                if(_instrument.token in self.__subscribers): del self.__subscribers[_instrument.token]
+                if(_instrument in self.__subscribers): del self.__subscribers[_instrument]
         else:
             if not isinstance(instrument, Instrument):
                 raise TypeError("Required parameter instrument not of type Instrument")
             exchange = self.__exchange_codes[instrument.exchange]
             arr = [[exchange, int(instrument.token)]]
-            if(instrument.token in self.__subscribers): del self.__subscribers[instrument.token]
+            if(instrument in self.__subscribers): del self.__subscribers[instrument]
         if(live_feed_type == LiveFeedType.MARKET_DATA):
             mode = 'marketdata' 
         elif(live_feed_type == LiveFeedType.COMPACT):
@@ -706,28 +735,24 @@ class AliceBlue:
 
     def get_all_subscriptions(self):
         """ get the current feed of an instrument """
-        res = {}
-        for key, value in self.__subscribers.items():
-            ins = self.get_instrument_by_token(key)
-            res[ins] = value
-        return res
+        return self.__subscribers
 
     def get_instrument_by_symbol(self, exchange, symbol):
         # get instrument given exchange and symbol
         exchange = exchange.upper()
         # check if master contract exists
         if exchange not in self.__master_contracts_by_symbol:
-            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
                             "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
             return None
         master_contract = self.__master_contracts_by_symbol[exchange]
         if symbol not in master_contract:
-            logging.warning(f"Cannot find symbol {exchange} {symbol} in master contract")
+            logger.warning(f"Cannot find symbol {exchange} {symbol} in master contract")
             return None
         return master_contract[symbol]
     
-    def get_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE = False):
-        res = self.search_instruments('NFO', symbol)
+    def get_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE = False, exchange = 'NFO'):
+        res = self.search_instruments(exchange, symbol)
         matches = []
         for i in res:
             if(i.expiry == expiry_date):
@@ -739,7 +764,7 @@ class AliceBlue:
             else:
                 sp = i.symbol.split(' ')
                 if((sp[-1] == 'CE') or (sp[-1] == 'PE')):           # Only option scrips 
-                    if(sp[-2] == str(strike)):
+                    if(float(sp[-2]) == float(strike)):
                         if(is_CE == True):
                             if(sp[-1] == 'CE'):
                                 return i
@@ -753,7 +778,7 @@ class AliceBlue:
         matches = []
         # check if master contract exists
         if exchange not in self.__master_contracts_by_token:
-            logging.warning(f"Cannot find exchange {exchange} in master contract. "
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
                 "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
             return None
         master_contract = self.__master_contracts_by_token[exchange]
@@ -762,14 +787,20 @@ class AliceBlue:
                 matches.append(master_contract[contract])
         return matches
 
-    def get_instrument_by_token(self, token):
-        if(type(token) is int):
-            token = str(token)
-        for _, lst in self.__master_contracts_by_token.items():
-            for key, value in lst.items():
-                if token == key:
-                    return value
-        return None
+    def get_instrument_by_token(self, exchange, token):
+        # get instrument given exchange and token
+        exchange = exchange.upper()
+        token = int(token)
+        # check if master contract exists
+        if exchange not in self.__master_contracts_by_symbol:
+            logger.warning(f"Cannot find exchange {exchange} in master contract. "
+                            "Please ensure if that exchange is enabled in your profile and downloaded the master contract for the same")
+            return None
+        master_contract = self.__master_contracts_by_token[exchange]
+        if token not in master_contract:
+            logger.warning(f"Cannot find symbol {exchange} {token} in master contract")
+            return None
+        return master_contract[token]
 
     def get_master_contract(self, exchange):
         return self.__master_contracts_by_symbol[exchange]
@@ -778,14 +809,14 @@ class AliceBlue:
         """ returns all the tradable contracts of an exchange
             placed in an OrderedDict and the key is the token
         """
-        logging.debug(f'Downloading master contracts for exchange: {exchange}')
+        logger.info(f'Downloading master contracts for exchange: {exchange}')
         body = self.__api_call_helper('master_contract', Requests.GET, {'exchange': exchange}, None)
         master_contract_by_token = OrderedDict()
         master_contract_by_symbol = OrderedDict()
         for sub in body:
             for scrip in body[sub]:
                 # convert token
-                token = scrip['code']
+                token = int(scrip['code'])
     
                 # convert symbol to upper
                 symbol = scrip['symbol']
@@ -824,7 +855,7 @@ class AliceBlue:
         return json.loads(response.text)
 
     def __api_call(self, url, http_method, data):
-        #logging.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
+        #logger.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
         headers = {"Content-Type": "application/json"} 
         if(len(self.__access_token) > 100):
             headers['X-Authorization-Token'] = self.__access_token
