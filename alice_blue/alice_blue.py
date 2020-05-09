@@ -753,6 +753,8 @@ class AliceBlue:
     
     def get_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE = False, exchange = 'NFO'):
         res = self.search_instruments(exchange, symbol)
+        if(res == None):
+            return
         matches = []
         for i in res:
             if(i.expiry == expiry_date):
