@@ -669,12 +669,20 @@ class AliceBlue:
         return ret
 
     def cancel_all_orders(self):
+        ret = []
         orders = self.get_order_history()['data']
         if not orders:
             return
         for c_order in orders['pending_orders']:
-            self.cancel_order(c_order['oms_order_id'])
-        
+            if(c_order['product'] == 'BO'):
+                r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'])
+            elif(c_order['product'] == 'CO'):
+                r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'], is_co = True)
+            else:
+                r = self.cancel_order(c_order['oms_order_id'])
+            ret.append(r)
+        return ret
+
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
