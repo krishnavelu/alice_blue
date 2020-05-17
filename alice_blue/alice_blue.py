@@ -674,8 +674,8 @@ class AliceBlue:
         if not orders:
             return
         for c_order in orders['pending_orders']:
-            if(c_order['product'] == 'BO'):
-                r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'])
+            if(c_order['product'] == 'BO' and c_order['leg_order_indicator']):
+                r = self.cancel_order(c_order['leg_order_indicator'], leg_order_id = c_order['leg_order_indicator'])
             elif(c_order['product'] == 'CO'):
                 r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'], is_co = True)
             else:
