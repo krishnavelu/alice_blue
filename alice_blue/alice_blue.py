@@ -683,6 +683,12 @@ class AliceBlue:
             ret.append(r)
         return ret
 
+    def subscribe_market_status(self):
+        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
+
+    def subscribe_exchange_messages(self):
+        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
+
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
