@@ -240,6 +240,30 @@ Example result of `get_exchange_messages()`
 [{'exchange': 'NSE', 'length': 32, 'message': b'DS : Bulk upload can be started.', 'exchange_time_stamp': 1590148595}, {'exchange': 'NFO', 'length': 200, 'message': b'MARKET WIDE LIMIT FOR VEDL IS 183919959. OPEN POSITIONS IN VEDL HAVE REACHED 84 PERCENT OF THE MARKET WIDE LIMIT.                                                                                       ', 'exchange_time_stamp': 1590146132}, {'exchange': 'CDS', 'length': 54, 'message': b'DS : Regular segment Bhav copy broadcast successfully.', 'exchange_time_stamp': 1590148932}, {'exchange': 'MCX', 'length': 7, 'message': b'.......', 'exchange_time_stamp': 1590196159}]
 ```
 
+#### Market Status messages & Exchange messages through callbacks
+```python
+socket_opened = False
+def market_status_messages(message):
+    print(f"market status messages {message}")
+
+def exchange_messages(message):
+    print(f"exchange messages {message}")
+
+def open_callback():
+    global socket_opened
+    socket_opened = True
+
+alice.start_websocket(market_status_messages_callback=market_status_messages,
+					  exchange_messages_callback=exchange_messages,
+                      socket_open_callback=open_callback,
+                      run_in_background=True)
+while(socket_opened==False):
+    pass
+alice.subscribe_market_status_messages()
+alice.subscribe_exchange_messages()
+sleep(10)
+```
+
 ### Place an order
 Place limit, market, SL, SL-M, AMO, BO, CO orders
 

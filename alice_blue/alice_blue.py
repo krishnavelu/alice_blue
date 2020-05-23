@@ -184,6 +184,8 @@ class AliceBlue:
         self.__on_open = None
         self.__subscribe_callback = None
         self.__order_update_callback = None
+        self.__market_status_messages_callback = None
+        self.__exchange_messages_callback = None
         self.__subscribers = {}
         self.__market_status_messages = []
         self.__exchange_messages = []
@@ -349,14 +351,16 @@ class AliceBlue:
             res = self.__modify_human_readable_values(p)
             self.__market_status_messages.append(res) 
             logger.info(f"market status {res}")
-            return
+            if(self.__market_status_messages_callback is not None):
+                self.__market_status_messages_callback(res)
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
             logger.info(f"exchange message {message}")
             p = ExchangeMessage.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p)
             self.__exchange_messages.append(res) 
             logger.info(f"exchange message {res}")
-            return
+            if(self.__exchange_messages_callback is not None):
+                self.__exchange_messages_callback(res)
          
     def __on_close_callback(self, ws=None):
         self.__websocket_connected = False
@@ -400,12 +404,16 @@ class AliceBlue:
                                 socket_open_callback = None,
                                 socket_close_callback = None,
                                 socket_error_callback = None,
-                                run_in_background=False):
+                                run_in_background=False,
+                                market_status_messages_callback = None,
+                                exchange_messages_callback = None):
         self.__on_open = socket_open_callback
         self.__on_disconnect = socket_close_callback
         self.__on_error = socket_error_callback
         self.__subscribe_callback = subscribe_callback
         self.__order_update_callback = order_update_callback
+        self.__market_status_messages_callback = market_status_messages_callback
+        self.__exchange_messages_callback = exchange_messages_callback
         
         url = self.__service_config['socket_endpoint'].format(access_token=self.__access_token)
         self.__websocket = websocket.WebSocketApp(url,
