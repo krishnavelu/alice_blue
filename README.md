@@ -124,6 +124,12 @@ Search for multiple instruments by matching the name
 all_banknifty_scrips = alice.search_instruments('NFO', 'BANKNIFTY')
 ```
 
+Search for multiple instruments by matching multiple names
+```python
+multiple_underlying = ['BANKNIFTY','NIFTY','INFY','BHEL']
+all_scripts = alice.search_instruments('NFO', multiple_underlying)
+```
+
 Search FNO instruments easily by mentioning expiry, strike & call or put.
 ```python
 bn_fut = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=True, strike=None, is_CE = False)
