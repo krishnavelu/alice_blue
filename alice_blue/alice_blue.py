@@ -8,7 +8,7 @@ import datetime
 from time import sleep
 from bs4 import BeautifulSoup
 from collections import OrderedDict
-from protlib import CUInt, CStruct, CULong, CUChar, CArray
+from protlib import CUInt, CStruct, CULong, CUChar, CArray, CUShort, CString
 from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
@@ -128,19 +128,18 @@ class OpenInterest(CStruct):
     initial_open_interest = CUChar()
     exchange_time_stamp = CUInt()
 
-# class ExchangeMessage(CStruct):
-#     exchange = CUChar()
-#     length = CUShort()
-#     message = CString()
-#     exchange_time_stamp = CUInt()
-# 
-# class MarketStatus(CStruct):
-#     exchange = CUChar()
-#     length_of_market_type = CUShort()
-#     market_type = CString()
-#     length_of_status = CUShort()
-#     status = CString()
-#     exchange_time_stamp = CUInt()
+class ExchangeMessage(CStruct):
+    exchange = CUChar()
+    length = CUShort()
+    message = CString(length = "length")
+    exchange_time_stamp = CUInt()
+ 
+class MarketStatus(CStruct):
+    exchange = CUChar()
+    length_of_market_type = CUShort()
+    market_type = CString(length = "length_of_market_type")
+    length_of_status = CUShort()
+    status = CString(length = "length_of_status")
 
 class AliceBlue:
     # dictionary object to hold settings
@@ -186,6 +185,8 @@ class AliceBlue:
         self.__subscribe_callback = None
         self.__order_update_callback = None
         self.__subscribers = {}
+        self.__market_status_messages = []
+        self.__exchange_messages = []
         self.__exchange_codes = {'NSE' : 1,
                                  'NFO' : 2,
                                  'CDS' : 3,
@@ -297,12 +298,14 @@ class AliceBlue:
         return dictionary
     
     def __conver_exchanges(self, dictionary):
-        d = self.__exchange_codes
-        dictionary['exchange'] = list(d.keys())[list(d.values()).index(dictionary['exchange'])]
+        if('exchange' in dictionary):
+            d = self.__exchange_codes
+            dictionary['exchange'] = list(d.keys())[list(d.values()).index(dictionary['exchange'])]
         return dictionary
 
     def __convert_instrument(self, dictionary):
-        dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
+        if('exchange' in dictionary) and ('token' in dictionary) and ('instrument' in dictionary):
+            dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
         return dictionary
         
     def __modify_human_readable_values(self, dictionary):
@@ -342,13 +345,17 @@ class AliceBlue:
             res = self.__modify_human_readable_values(p) 
         elif(message[0] == WsFrameMode.MARKET_STATUS):
             logger.info(f"market status {message}")
-#             p = MarketStatus.parse(message[1:]).__dict__
-#             res = self.__modify_human_readable_values(p) 
+            p = MarketStatus.parse(message[1:]).__dict__
+            res = self.__modify_human_readable_values(p)
+            self.__market_status_messages.append(res) 
+            logger.info(f"market status {res}")
             return
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
             logger.info(f"exchange message {message}")
-#             p = ExchangeMessage.parse(message[1:]).__dict__
-#             res = self.__modify_human_readable_values(p) 
+            p = ExchangeMessage.parse(message[1:]).__dict__
+            res = self.__modify_human_readable_values(p)
+            self.__exchange_messages.append(res) 
+            logger.info(f"exchange message {res}")
             return
          
     def __on_close_callback(self, ws=None):
@@ -683,12 +690,18 @@ class AliceBlue:
             ret.append(r)
         return ret
 
-    def subscribe_market_status(self):
+    def subscribe_market_status_messages(self):
         return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
 
+    def get_market_status_messages(self):
+        return self.__market_status_messages
+    
     def subscribe_exchange_messages(self):
         return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
 
+    def get_exchange_messages(self):
+        return self.__exchange_messages
+    
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):

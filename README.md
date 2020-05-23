@@ -208,6 +208,38 @@ alice.unsubscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get
 alice.get_all_subscriptions() # All
 ```
 
+### Market Status messages & Exchange messages.
+Subscribe to market status messages
+```python
+alice.subscribe_market_status_messages()
+```
+
+Getting market status messages.
+```python
+print(alice.get_market_status_messages())
+```
+
+Example result of `get_market_status_messages()`
+```
+[{'exchange': 'NSE', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 31, 'status': b'The Closing Session has closed.'}, {'exchange': 'NFO', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'CDS', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'BSE', 'length_of_market_type': 13, 'market_type': b'OTHER SESSION', 'length_of_status': 0, 'status': b''}]
+```
+Note: As per `alice blue` [documention](http://antplus.aliceblueonline.com/#market-status) all market status messages should be having a timestamp. But in actual the server does't send timestamp, so the library is unable to get timestamp for now.
+
+Subscribe to exchange messages
+```python
+alice.subscribe_exchange_messages()
+```
+
+Getting market status messages.
+```python
+print(alice.get_exchange_messages())
+```
+
+Example result of `get_exchange_messages()`
+```
+[{'exchange': 'NSE', 'length': 32, 'message': b'DS : Bulk upload can be started.', 'exchange_time_stamp': 1590148595}, {'exchange': 'NFO', 'length': 200, 'message': b'MARKET WIDE LIMIT FOR VEDL IS 183919959. OPEN POSITIONS IN VEDL HAVE REACHED 84 PERCENT OF THE MARKET WIDE LIMIT.                                                                                       ', 'exchange_time_stamp': 1590146132}, {'exchange': 'CDS', 'length': 54, 'message': b'DS : Regular segment Bhav copy broadcast successfully.', 'exchange_time_stamp': 1590148932}, {'exchange': 'MCX', 'length': 7, 'message': b'.......', 'exchange_time_stamp': 1590196159}]
+```
+
 ### Place an order
 Place limit, market, SL, SL-M, AMO, BO, CO orders
 
