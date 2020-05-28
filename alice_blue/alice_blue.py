@@ -306,7 +306,7 @@ class AliceBlue:
         return dictionary
 
     def __convert_instrument(self, dictionary):
-        if('exchange' in dictionary) and ('token' in dictionary) and ('instrument' in dictionary):
+        if('exchange' in dictionary) and ('token' in dictionary):
             dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
         return dictionary
         
