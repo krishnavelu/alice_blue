@@ -186,6 +186,8 @@ class AliceBlue:
         self.__order_update_callback = None
         self.__market_status_messages_callback = None
         self.__exchange_messages_callback = None
+        self.__oi_callback = None
+        self.__dpr_callback = None
         self.__subscribers = {}
         self.__market_status_messages = []
         self.__exchange_messages = []
@@ -342,23 +344,23 @@ class AliceBlue:
         elif(message[0] == WsFrameMode.DPR):
             p = DPR.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
+            if(self.__dpr_callback is not None):
+                self.__dpr_callback(res)
         elif(message[0] == WsFrameMode.OI):
             p = OpenInterest.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
+            if(self.__oi_callback is not None):
+                self.__oi_callback(res)
         elif(message[0] == WsFrameMode.MARKET_STATUS):
-            logger.info(f"market status {message}")
             p = MarketStatus.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p)
             self.__market_status_messages.append(res) 
-            logger.info(f"market status {res}")
             if(self.__market_status_messages_callback is not None):
                 self.__market_status_messages_callback(res)
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            logger.info(f"exchange message {message}")
             p = ExchangeMessage.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p)
             self.__exchange_messages.append(res) 
-            logger.info(f"exchange message {res}")
             if(self.__exchange_messages_callback is not None):
                 self.__exchange_messages_callback(res)
          
@@ -406,7 +408,9 @@ class AliceBlue:
                                 socket_error_callback = None,
                                 run_in_background=False,
                                 market_status_messages_callback = None,
-                                exchange_messages_callback = None):
+                                exchange_messages_callback = None,
+                                oi_callback = None,
+                                dpr_callback = None):
         self.__on_open = socket_open_callback
         self.__on_disconnect = socket_close_callback
         self.__on_error = socket_error_callback
@@ -414,6 +418,8 @@ class AliceBlue:
         self.__order_update_callback = order_update_callback
         self.__market_status_messages_callback = market_status_messages_callback
         self.__exchange_messages_callback = exchange_messages_callback
+        self.__oi_callback = oi_callback
+        self.__dpr_callback = dpr_callback
         
         url = self.__service_config['socket_endpoint'].format(access_token=self.__access_token)
         self.__websocket = websocket.WebSocketApp(url,
@@ -822,10 +828,10 @@ class AliceBlue:
         for contract in master_contract:
             if (isinstance(symbol, list)):
                 for sym in symbol:
-                    if sym == master_contract[contract].symbol.split(' ')[0]:
+                    if sym.lower() in master_contract[contract].symbol.split(' ')[0].lower():
                         matches.append(master_contract[contract])
             else:
-                if symbol == master_contract[contract].symbol.split(' ')[0]:
+                if symbol.lower() in master_contract[contract].symbol.split(' ')[0].lower():
                     matches.append(master_contract[contract])
         return matches
 

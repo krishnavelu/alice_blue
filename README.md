@@ -99,29 +99,41 @@ alice = AliceBlue(username='username', password='password', access_token=access_
 ```
 This will reduce a few milliseconds in object creation time of AliceBlue object.
 
+### Get tradable instruments
+Symbols can be retrieved in multiple ways. Once you have the master contract loaded for an exchange, you can get an instrument in many ways.
 
-### Search for symbols
-Symbols can be retrieved in multiple ways. Once you have the master contract loaded for an exchange, you can search for an instrument in many ways.
-
-Search for a single instrument by it's name:
+Get a single instrument by it's name:
 ```python
 tatasteel_nse_eq = alice.get_instrument_by_symbol('NSE', 'TATASTEEL')
 reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE')
 ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC')
 india_vix_nse_index = alice.get_instrument_by_symbol('NSE', 'India VIX')
-sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'Sensex')
+sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'SENSEX')
 ```
 
-Search for a single instrument by it's token number (generally useful only for BSE Equities):
+Get a single instrument by it's token number (generally useful only for BSE Equities):
 ```python
 ongc_bse_eq = alice.get_instrument_by_token('BSE', 500312)
 reliance_bse_eq = alice.get_instrument_by_token('BSE', 500325)
 acc_nse_eq = alice.get_instrument_by_token('NSE', 22)
 ```
 
-Search for multiple instruments by matching the name
+Get FNO instruments easily by mentioning expiry, strike & call or put.
 ```python
-all_banknifty_scrips = alice.search_instruments('NFO', 'BANKNIFTY')
+bn_fut = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=True, strike=None, is_CE = False)
+bn_call = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = True)
+bn_put = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = False)
+```
+
+### Search for symbols
+Search for multiple instruments by matching the name. This works case insensitive and returns all instrument which has the name in its symbol.
+```python
+all_sensex_scrips = alice.search_instruments('BSE', 'sEnSeX')
+print(all_sensex_scrips)
+```
+The above code results multiple symbol which has 'sensex' in its symbol.
+```
+[Instrument(exchange='BSE', token=1, symbol='SENSEX', name='SENSEX', expiry=None, lot_size=None), Instrument(exchange='BSE', token=540154, symbol='IDFSENSEXE B', name='IDFC Mutual Fund', expiry=None, lot_size=None), Instrument(exchange='BSE', token=532985, symbol='KTKSENSEX B', name='KOTAK MAHINDRA MUTUAL FUND', expiry=None, lot_size=None), Instrument(exchange='BSE', token=538683, symbol='NETFSENSEX B', name='NIPPON INDIA ETF SENSEX', expiry=None, lot_size=None), Instrument(exchange='BSE', token=535276, symbol='SBISENSEX B', name='SBI MUTUAL FUND - SBI ETF SENS', expiry=None, lot_size=None)]
 ```
 
 Search for multiple instruments by matching multiple names
@@ -129,14 +141,6 @@ Search for multiple instruments by matching multiple names
 multiple_underlying = ['BANKNIFTY','NIFTY','INFY','BHEL']
 all_scripts = alice.search_instruments('NFO', multiple_underlying)
 ```
-
-Search FNO instruments easily by mentioning expiry, strike & call or put.
-```python
-bn_fut = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=True, strike=None, is_CE = False)
-bn_call = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = True)
-bn_put = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = False)
-```
-
 
 #### Instrument object
 Instruments are represented by instrument objects. These are named-tuples that are created while getting the master contracts. They are used when placing an order and searching for an instrument. The structure of an instrument tuple is as follows:
