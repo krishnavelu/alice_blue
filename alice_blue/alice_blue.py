@@ -505,7 +505,7 @@ class AliceBlue:
         if(product_type == ProductType.Intraday):
             prod_type = 'MIS'
         elif(product_type == ProductType.Delivery):
-            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX'):
+            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX') or (instrument.exchange == 'CDS'):
                 prod_type = 'NRML'
             else:
                 prod_type = 'CNC'
