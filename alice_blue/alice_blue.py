@@ -225,6 +225,7 @@ class AliceBlue:
 
     @staticmethod
     def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
+        """ Login and get access token """
         #Get the Code
         if(app_id is None):
             app_id = username
@@ -371,6 +372,7 @@ class AliceBlue:
 
     def __on_open_callback(self, ws=None):
         self.__websocket_connected = True
+        self.__resubscribe()
         if self.__on_open:
             self.__on_open()
 
@@ -411,6 +413,7 @@ class AliceBlue:
                                 exchange_messages_callback = None,
                                 oi_callback = None,
                                 dpr_callback = None):
+        """ Start a websocket connection for getting live data """
         self.__on_open = socket_open_callback
         self.__on_disconnect = socket_close_callback
         self.__on_error = socket_error_callback
@@ -438,21 +441,26 @@ class AliceBlue:
             self.__ws_run_forever()
 
     def get_profile(self):
+        """ Get profile """
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
         if(profile['status'] != 'error'):
             self.__enabled_exchanges = profile['data']['exchanges']
         return profile
 
     def get_balance(self):
+        """ Get balance/margins """
         return self.__api_call_helper('balance', Requests.GET, None, None)
 
     def get_daywise_positions(self):
+        """ Get daywise positions """
         return self.__api_call_helper('positions_daywise', Requests.GET, None, None)
 
     def get_netwise_positions(self):
+        """ Get netwise positions """
         return self.__api_call_helper('positions_netwise', Requests.GET, None, None)
 
     def get_holding_positions(self):
+        """ Get holding positions """
         return self.__api_call_helper('positions_holdings', Requests.GET, None, None)
 
     def get_order_history(self, order_id=None):
@@ -463,6 +471,7 @@ class AliceBlue:
             return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None);
     
     def get_scrip_info(self, instrument):
+        """ Get scrip information """
         params = {'exchange': instrument.exchange, 'token': instrument.token}
         return self.__api_call_helper('scripinfo', Requests.GET, params, None)
 
@@ -471,6 +480,7 @@ class AliceBlue:
         return self.__api_call_helper('trade_book', Requests.GET, None, None)
 
     def get_exchanges(self):
+        """ Get enabled exchanges """
         return self.__enabled_exchanges
 
     def place_order(self, transaction_type, instrument, quantity, order_type,
@@ -680,6 +690,7 @@ class AliceBlue:
         return self.__api_call_helper('modify_order', Requests.PUT, None, order)
 
     def cancel_order(self, order_id, leg_order_id=None, is_co=False):
+        """ Cancel single order """
         if(is_co == False):
             if(leg_order_id == None):
                 ret = self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
@@ -690,6 +701,7 @@ class AliceBlue:
         return ret
 
     def cancel_all_orders(self):
+        """ Cancel all orders """
         ret = []
         orders = self.get_order_history()['data']
         if not orders:
@@ -705,15 +717,19 @@ class AliceBlue:
         return ret
 
     def subscribe_market_status_messages(self):
+        """ Subscribe to market messages """
         return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
 
     def get_market_status_messages(self):
+        """ Get market messages """
         return self.__market_status_messages
     
     def subscribe_exchange_messages(self):
+        """ Subscribe to exchange messages """
         return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
 
     def get_exchange_messages(self):
+        """ Get stored exchange messages """
         return self.__exchange_messages
     
     def subscribe(self, instrument, live_feed_type):
@@ -746,7 +762,7 @@ class AliceBlue:
         return self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
-        """ subscribe to the current feed of an instrument """
+        """ unsubscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
             raise TypeError("Required parameter live_feed_type not of type LiveFeedType")
         arr = []
@@ -775,10 +791,34 @@ class AliceBlue:
         return self.__ws_send(data)
 
     def get_all_subscriptions(self):
-        """ get the current feed of an instrument """
+        """ get the all subscribed instruments """
         return self.__subscribers
+    
+    def __resubscribe(self):
+        market = []
+        compact = []
+        snap = []
+        full = []
+        for key, value in self.get_all_subscriptions().items():
+            if(value == LiveFeedType.MARKET_DATA):
+                market.append(key) 
+            elif(value == LiveFeedType.COMPACT):
+                compact.append(key) 
+            elif(value == LiveFeedType.SNAPQUOTE):
+                snap.append(key) 
+            elif(value == LiveFeedType.FULL_SNAPQUOTE):
+                full.append(key)
+        if(len(market) > 0):
+            self.subscribe(market, LiveFeedType.MARKET_DATA)
+        if(len(compact) > 0):
+            self.subscribe(compact, LiveFeedType.COMPACT)
+        if(len(snap) > 0):
+            self.subscribe(snap, LiveFeedType.SNAPQUOTE)
+        if(len(full) > 0):
+            self.subscribe(full, LiveFeedType.FULL_SNAPQUOTE)
 
     def get_instrument_by_symbol(self, exchange, symbol):
+        """ get instrument by providing symbol """
         # get instrument given exchange and symbol
         exchange = exchange.upper()
         # check if master contract exists
@@ -793,6 +833,7 @@ class AliceBlue:
         return master_contract[symbol]
     
     def get_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE = False, exchange = 'NFO'):
+        """ get instrument for FNO """
         res = self.search_instruments(exchange, symbol)
         if(res == None):
             return
@@ -816,6 +857,7 @@ class AliceBlue:
                                 return i
                             
     def search_instruments(self, exchange, symbol):
+        """ Search instrument by symbol match """
         # search instrument given exchange and symbol
         exchange = exchange.upper()
         matches = []
@@ -836,6 +878,7 @@ class AliceBlue:
         return matches
 
     def get_instrument_by_token(self, exchange, token):
+        """ Get instrument by providing token """
         # get instrument given exchange and token
         exchange = exchange.upper()
         token = int(token)
@@ -851,6 +894,7 @@ class AliceBlue:
         return master_contract[token]
 
     def get_master_contract(self, exchange):
+        """ Get master contract """
         return self.__master_contracts_by_symbol[exchange]
 
     def __get_master_contract(self, exchange):
