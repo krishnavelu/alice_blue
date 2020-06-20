@@ -553,15 +553,15 @@ Product types indicate the complexity of the order you want to place. Valid prod
 
 ## Example strategy using alice blue API
 [Here](https://gist.github.com/krishnavelu/e0df312ccf5f022edb1823461ff4230e) is an example moving average strategy using alice blue API.
-This strategy generates a buy signal when 5-EMA > 20-EMA (golden cross) or a sell signal when 5-EMA < 20-EMA.
+This strategy generates a buy signal when 5-EMA > 20-EMA (golden cross) or a sell signal when 5-EMA < 20-EMA (death cross).
 
 ## Read this before creating an issue
 Before creating an issue in this library, please follow the following steps.
 
-1. Search the problem you are facing is already asked by someone else. There might be some issues already there either solved/unsolved related to your problem. Go to [issues](https://github.com/krishnavelu/alice_blue/issues) page, use `is:issue` as filter and search your problem. ![image](https://user-images.githubusercontent.com/38440742/85207058-376ee400-b2f4-11ea-91ad-c8fd8a682a12.png)
+1. Search the problem you are facing is already asked by someone else. There might be some issues already there, either solved/unsolved related to your problem. Go to [issues](https://github.com/krishnavelu/alice_blue/issues) page, use `is:issue` as filter and search your problem. ![image](https://user-images.githubusercontent.com/38440742/85207058-376ee400-b2f4-11ea-91ad-c8fd8a682a12.png)
 2. If you feel your problem is not asked by anyone or no issues are related to your problem, then create a new issue.
 3. Describe your problem in detail while creating the issue. If you don't have time to detail/describe the problem you are facing, assume that I also won't be having time to respond to your problem.
-4. Post a sample code of the problem you are facing. If I copy paste the code directly from the issue, I should be able to reproduce the problem you are facing. 
+4. Post a sample code of the problem you are facing. If I copy paste the code directly from issue, I should be able to reproduce the problem you are facing. 
 5. Before posting the sample code, test your sample code yourself once. Only sample code should be tested, no other addition should be there while you are testing.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
