@@ -99,38 +99,48 @@ alice = AliceBlue(username='username', password='password', access_token=access_
 ```
 This will reduce a few milliseconds in object creation time of AliceBlue object.
 
+### Get tradable instruments
+Symbols can be retrieved in multiple ways. Once you have the master contract loaded for an exchange, you can get an instrument in many ways.
 
-### Search for symbols
-Symbols can be retrieved in multiple ways. Once you have the master contract loaded for an exchange, you can search for an instrument in many ways.
-
-Search for a single instrument by it's name:
+Get a single instrument by it's name:
 ```python
 tatasteel_nse_eq = alice.get_instrument_by_symbol('NSE', 'TATASTEEL')
 reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE')
 ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC')
 india_vix_nse_index = alice.get_instrument_by_symbol('NSE', 'India VIX')
-sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'Sensex')
+sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'SENSEX')
 ```
 
-Search for a single instrument by it's token number (generally useful only for BSE Equities):
+Get a single instrument by it's token number (generally useful only for BSE Equities):
 ```python
 ongc_bse_eq = alice.get_instrument_by_token('BSE', 500312)
 reliance_bse_eq = alice.get_instrument_by_token('BSE', 500325)
 acc_nse_eq = alice.get_instrument_by_token('NSE', 22)
 ```
 
-Search for multiple instruments by matching the name
-```python
-all_banknifty_scrips = alice.search_instruments('NFO', 'BANKNIFTY')
-```
-
-Search FNO instruments easily by mentioning expiry, strike & call or put.
+Get FNO instruments easily by mentioning expiry, strike & call or put.
 ```python
 bn_fut = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=True, strike=None, is_CE = False)
 bn_call = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = True)
 bn_put = alice.get_instrument_for_fno(symbol = 'BANKNIFTY', expiry_date=datetime.date(2019, 6, 27), is_fut=False, strike=30000, is_CE = False)
 ```
 
+### Search for symbols
+Search for multiple instruments by matching the name. This works case insensitive and returns all instrument which has the name in its symbol.
+```python
+all_sensex_scrips = alice.search_instruments('BSE', 'sEnSeX')
+print(all_sensex_scrips)
+```
+The above code results multiple symbol which has 'sensex' in its symbol.
+```
+[Instrument(exchange='BSE', token=1, symbol='SENSEX', name='SENSEX', expiry=None, lot_size=None), Instrument(exchange='BSE', token=540154, symbol='IDFSENSEXE B', name='IDFC Mutual Fund', expiry=None, lot_size=None), Instrument(exchange='BSE', token=532985, symbol='KTKSENSEX B', name='KOTAK MAHINDRA MUTUAL FUND', expiry=None, lot_size=None), Instrument(exchange='BSE', token=538683, symbol='NETFSENSEX B', name='NIPPON INDIA ETF SENSEX', expiry=None, lot_size=None), Instrument(exchange='BSE', token=535276, symbol='SBISENSEX B', name='SBI MUTUAL FUND - SBI ETF SENS', expiry=None, lot_size=None)]
+```
+
+Search for multiple instruments by matching multiple names
+```python
+multiple_underlying = ['BANKNIFTY','NIFTY','INFY','BHEL']
+all_scripts = alice.search_instruments('NFO', multiple_underlying)
+```
 
 #### Instrument object
 Instruments are represented by instrument objects. These are named-tuples that are created while getting the master contracts. They are used when placing an order and searching for an instrument. The structure of an instrument tuple is as follows:
@@ -200,6 +210,62 @@ alice.unsubscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get
 #### Get All Subscribed Symbols
 ```python
 alice.get_all_subscriptions() # All
+```
+
+### Market Status messages & Exchange messages.
+Subscribe to market status messages
+```python
+alice.subscribe_market_status_messages()
+```
+
+Getting market status messages.
+```python
+print(alice.get_market_status_messages())
+```
+
+Example result of `get_market_status_messages()`
+```
+[{'exchange': 'NSE', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 31, 'status': b'The Closing Session has closed.'}, {'exchange': 'NFO', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'CDS', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'BSE', 'length_of_market_type': 13, 'market_type': b'OTHER SESSION', 'length_of_status': 0, 'status': b''}]
+```
+Note: As per `alice blue` [documention](http://antplus.aliceblueonline.com/#market-status) all market status messages should be having a timestamp. But in actual the server does't send timestamp, so the library is unable to get timestamp for now.
+
+Subscribe to exchange messages
+```python
+alice.subscribe_exchange_messages()
+```
+
+Getting market status messages.
+```python
+print(alice.get_exchange_messages())
+```
+
+Example result of `get_exchange_messages()`
+```
+[{'exchange': 'NSE', 'length': 32, 'message': b'DS : Bulk upload can be started.', 'exchange_time_stamp': 1590148595}, {'exchange': 'NFO', 'length': 200, 'message': b'MARKET WIDE LIMIT FOR VEDL IS 183919959. OPEN POSITIONS IN VEDL HAVE REACHED 84 PERCENT OF THE MARKET WIDE LIMIT.                                                                                       ', 'exchange_time_stamp': 1590146132}, {'exchange': 'CDS', 'length': 54, 'message': b'DS : Regular segment Bhav copy broadcast successfully.', 'exchange_time_stamp': 1590148932}, {'exchange': 'MCX', 'length': 7, 'message': b'.......', 'exchange_time_stamp': 1590196159}]
+```
+
+#### Market Status messages & Exchange messages through callbacks
+```python
+socket_opened = False
+def market_status_messages(message):
+    print(f"market status messages {message}")
+
+def exchange_messages(message):
+    print(f"exchange messages {message}")
+
+def open_callback():
+    global socket_opened
+    socket_opened = True
+
+alice.start_websocket(market_status_messages_callback=market_status_messages,
+					  exchange_messages_callback=exchange_messages,
+                      socket_open_callback=open_callback,
+                      run_in_background=True)
+while(socket_opened==False):
+    pass
+alice.subscribe_market_status_messages()
+alice.subscribe_exchange_messages()
+sleep(10)
 ```
 
 ### Place an order
@@ -484,3 +550,20 @@ Product types indicate the complexity of the order you want to place. Valid prod
 * `ProductType.Delivery` - Delivery order that will be held with you after market close
 * `ProductType.CoverOrder` - Cover order
 * `ProductType.BracketOrder` - One cancels other order. Also known as bracket order
+
+## Example strategy using alice blue API
+[Here](https://gist.github.com/krishnavelu/e0df312ccf5f022edb1823461ff4230e) is an example moving average strategy using alice blue API.
+This strategy generates a buy signal when 5-EMA > 20-EMA (golden cross) or a sell signal when 5-EMA < 20-EMA (death cross).
+
+## Read this before creating an issue
+Before creating an issue in this library, please follow the following steps.
+
+1. Search the problem you are facing is already asked by someone else. There might be some issues already there, either solved/unsolved related to your problem. Go to [issues](https://github.com/krishnavelu/alice_blue/issues) page, use `is:issue` as filter and search your problem. ![image](https://user-images.githubusercontent.com/38440742/85207058-376ee400-b2f4-11ea-91ad-c8fd8a682a12.png)
+2. If you feel your problem is not asked by anyone or no issues are related to your problem, then create a new issue.
+3. Describe your problem in detail while creating the issue. If you don't have time to detail/describe the problem you are facing, assume that I also won't be having time to respond to your problem.
+4. Post a sample code of the problem you are facing. If I copy paste the code directly from issue, I should be able to reproduce the problem you are facing. 
+5. Before posting the sample code, test your sample code yourself once. Only sample code should be tested, no other addition should be there while you are testing.
+6. Have some print() function calls to display the values of some variables related to your problem.
+7. Post the results of print() functions also in the issue.
+8. Use the insert code feature of github to inset code and print outputs, so that the code is displyed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
+9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are createing an issue.

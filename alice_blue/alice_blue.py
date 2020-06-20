@@ -8,7 +8,7 @@ import datetime
 from time import sleep
 from bs4 import BeautifulSoup
 from collections import OrderedDict
-from protlib import CUInt, CStruct, CULong, CUChar, CArray
+from protlib import CUInt, CStruct, CULong, CUChar, CArray, CUShort, CString
 from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
@@ -128,19 +128,18 @@ class OpenInterest(CStruct):
     initial_open_interest = CUChar()
     exchange_time_stamp = CUInt()
 
-# class ExchangeMessage(CStruct):
-#     exchange = CUChar()
-#     length = CUShort()
-#     message = CString()
-#     exchange_time_stamp = CUInt()
-# 
-# class MarketStatus(CStruct):
-#     exchange = CUChar()
-#     length_of_market_type = CUShort()
-#     market_type = CString()
-#     length_of_status = CUShort()
-#     status = CString()
-#     exchange_time_stamp = CUInt()
+class ExchangeMessage(CStruct):
+    exchange = CUChar()
+    length = CUShort()
+    message = CString(length = "length")
+    exchange_time_stamp = CUInt()
+ 
+class MarketStatus(CStruct):
+    exchange = CUChar()
+    length_of_market_type = CUShort()
+    market_type = CString(length = "length_of_market_type")
+    length_of_status = CUShort()
+    status = CString(length = "length_of_status")
 
 class AliceBlue:
     # dictionary object to hold settings
@@ -185,7 +184,13 @@ class AliceBlue:
         self.__on_open = None
         self.__subscribe_callback = None
         self.__order_update_callback = None
+        self.__market_status_messages_callback = None
+        self.__exchange_messages_callback = None
+        self.__oi_callback = None
+        self.__dpr_callback = None
         self.__subscribers = {}
+        self.__market_status_messages = []
+        self.__exchange_messages = []
         self.__exchange_codes = {'NSE' : 1,
                                  'NFO' : 2,
                                  'CDS' : 3,
@@ -220,6 +225,7 @@ class AliceBlue:
 
     @staticmethod
     def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
+        """ Login and get access token """
         #Get the Code
         if(app_id is None):
             app_id = username
@@ -297,12 +303,14 @@ class AliceBlue:
         return dictionary
     
     def __conver_exchanges(self, dictionary):
-        d = self.__exchange_codes
-        dictionary['exchange'] = list(d.keys())[list(d.values()).index(dictionary['exchange'])]
+        if('exchange' in dictionary):
+            d = self.__exchange_codes
+            dictionary['exchange'] = list(d.keys())[list(d.values()).index(dictionary['exchange'])]
         return dictionary
 
     def __convert_instrument(self, dictionary):
-        dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
+        if('exchange' in dictionary) and ('token' in dictionary):
+            dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
         return dictionary
         
     def __modify_human_readable_values(self, dictionary):
@@ -337,19 +345,25 @@ class AliceBlue:
         elif(message[0] == WsFrameMode.DPR):
             p = DPR.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
+            if(self.__dpr_callback is not None):
+                self.__dpr_callback(res)
         elif(message[0] == WsFrameMode.OI):
             p = OpenInterest.parse(message[1:]).__dict__
             res = self.__modify_human_readable_values(p) 
+            if(self.__oi_callback is not None):
+                self.__oi_callback(res)
         elif(message[0] == WsFrameMode.MARKET_STATUS):
-            logger.info(f"market status {message}")
-#             p = MarketStatus.parse(message[1:]).__dict__
-#             res = self.__modify_human_readable_values(p) 
-            return
+            p = MarketStatus.parse(message[1:]).__dict__
+            res = self.__modify_human_readable_values(p)
+            self.__market_status_messages.append(res) 
+            if(self.__market_status_messages_callback is not None):
+                self.__market_status_messages_callback(res)
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            logger.info(f"exchange message {message}")
-#             p = ExchangeMessage.parse(message[1:]).__dict__
-#             res = self.__modify_human_readable_values(p) 
-            return
+            p = ExchangeMessage.parse(message[1:]).__dict__
+            res = self.__modify_human_readable_values(p)
+            self.__exchange_messages.append(res) 
+            if(self.__exchange_messages_callback is not None):
+                self.__exchange_messages_callback(res)
          
     def __on_close_callback(self, ws=None):
         self.__websocket_connected = False
@@ -358,6 +372,7 @@ class AliceBlue:
 
     def __on_open_callback(self, ws=None):
         self.__websocket_connected = True
+        self.__resubscribe()
         if self.__on_open:
             self.__on_open()
 
@@ -393,12 +408,21 @@ class AliceBlue:
                                 socket_open_callback = None,
                                 socket_close_callback = None,
                                 socket_error_callback = None,
-                                run_in_background=False):
+                                run_in_background=False,
+                                market_status_messages_callback = None,
+                                exchange_messages_callback = None,
+                                oi_callback = None,
+                                dpr_callback = None):
+        """ Start a websocket connection for getting live data """
         self.__on_open = socket_open_callback
         self.__on_disconnect = socket_close_callback
         self.__on_error = socket_error_callback
         self.__subscribe_callback = subscribe_callback
         self.__order_update_callback = order_update_callback
+        self.__market_status_messages_callback = market_status_messages_callback
+        self.__exchange_messages_callback = exchange_messages_callback
+        self.__oi_callback = oi_callback
+        self.__dpr_callback = dpr_callback
         
         url = self.__service_config['socket_endpoint'].format(access_token=self.__access_token)
         self.__websocket = websocket.WebSocketApp(url,
@@ -417,21 +441,26 @@ class AliceBlue:
             self.__ws_run_forever()
 
     def get_profile(self):
+        """ Get profile """
         profile = self.__api_call_helper('profile', Requests.GET, None, None)
         if(profile['status'] != 'error'):
             self.__enabled_exchanges = profile['data']['exchanges']
         return profile
 
     def get_balance(self):
+        """ Get balance/margins """
         return self.__api_call_helper('balance', Requests.GET, None, None)
 
     def get_daywise_positions(self):
+        """ Get daywise positions """
         return self.__api_call_helper('positions_daywise', Requests.GET, None, None)
 
     def get_netwise_positions(self):
+        """ Get netwise positions """
         return self.__api_call_helper('positions_netwise', Requests.GET, None, None)
 
     def get_holding_positions(self):
+        """ Get holding positions """
         return self.__api_call_helper('positions_holdings', Requests.GET, None, None)
 
     def get_order_history(self, order_id=None):
@@ -442,6 +471,7 @@ class AliceBlue:
             return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None);
     
     def get_scrip_info(self, instrument):
+        """ Get scrip information """
         params = {'exchange': instrument.exchange, 'token': instrument.token}
         return self.__api_call_helper('scripinfo', Requests.GET, params, None)
 
@@ -450,6 +480,7 @@ class AliceBlue:
         return self.__api_call_helper('trade_book', Requests.GET, None, None)
 
     def get_exchanges(self):
+        """ Get enabled exchanges """
         return self.__enabled_exchanges
 
     def place_order(self, transaction_type, instrument, quantity, order_type,
@@ -484,7 +515,7 @@ class AliceBlue:
         if(product_type == ProductType.Intraday):
             prod_type = 'MIS'
         elif(product_type == ProductType.Delivery):
-            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX'):
+            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX') or (instrument.exchange == 'CDS'):
                 prod_type = 'NRML'
             else:
                 prod_type = 'CNC'
@@ -570,7 +601,7 @@ class AliceBlue:
             if i['order_type'] == OrderType.Limit:
                 if "price" not in i:
                     raise TypeError("Each element in orders should have key 'price' if its a limit order ")
-                if isinstance(i['price'], float):
+                if not isinstance(i['price'], float):
                     raise TypeError("Element price in orders should be of type float")
             else:
                 i['price'] = 0.0
@@ -659,6 +690,7 @@ class AliceBlue:
         return self.__api_call_helper('modify_order', Requests.PUT, None, order)
 
     def cancel_order(self, order_id, leg_order_id=None, is_co=False):
+        """ Cancel single order """
         if(is_co == False):
             if(leg_order_id == None):
                 ret = self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
@@ -669,12 +701,37 @@ class AliceBlue:
         return ret
 
     def cancel_all_orders(self):
+        """ Cancel all orders """
+        ret = []
         orders = self.get_order_history()['data']
         if not orders:
             return
         for c_order in orders['pending_orders']:
-            self.cancel_order(c_order['oms_order_id'])
-        
+            if(c_order['product'] == 'BO' and c_order['leg_order_indicator']):
+                r = self.cancel_order(c_order['leg_order_indicator'], leg_order_id = c_order['leg_order_indicator'])
+            elif(c_order['product'] == 'CO'):
+                r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'], is_co = True)
+            else:
+                r = self.cancel_order(c_order['oms_order_id'])
+            ret.append(r)
+        return ret
+
+    def subscribe_market_status_messages(self):
+        """ Subscribe to market messages """
+        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
+
+    def get_market_status_messages(self):
+        """ Get market messages """
+        return self.__market_status_messages
+    
+    def subscribe_exchange_messages(self):
+        """ Subscribe to exchange messages """
+        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
+
+    def get_exchange_messages(self):
+        """ Get stored exchange messages """
+        return self.__exchange_messages
+    
     def subscribe(self, instrument, live_feed_type):
         """ subscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
@@ -705,7 +762,7 @@ class AliceBlue:
         return self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
-        """ subscribe to the current feed of an instrument """
+        """ unsubscribe to the current feed of an instrument """
         if(type(live_feed_type) is not LiveFeedType):
             raise TypeError("Required parameter live_feed_type not of type LiveFeedType")
         arr = []
@@ -734,10 +791,34 @@ class AliceBlue:
         return self.__ws_send(data)
 
     def get_all_subscriptions(self):
-        """ get the current feed of an instrument """
+        """ get the all subscribed instruments """
         return self.__subscribers
+    
+    def __resubscribe(self):
+        market = []
+        compact = []
+        snap = []
+        full = []
+        for key, value in self.get_all_subscriptions().items():
+            if(value == LiveFeedType.MARKET_DATA):
+                market.append(key) 
+            elif(value == LiveFeedType.COMPACT):
+                compact.append(key) 
+            elif(value == LiveFeedType.SNAPQUOTE):
+                snap.append(key) 
+            elif(value == LiveFeedType.FULL_SNAPQUOTE):
+                full.append(key)
+        if(len(market) > 0):
+            self.subscribe(market, LiveFeedType.MARKET_DATA)
+        if(len(compact) > 0):
+            self.subscribe(compact, LiveFeedType.COMPACT)
+        if(len(snap) > 0):
+            self.subscribe(snap, LiveFeedType.SNAPQUOTE)
+        if(len(full) > 0):
+            self.subscribe(full, LiveFeedType.FULL_SNAPQUOTE)
 
     def get_instrument_by_symbol(self, exchange, symbol):
+        """ get instrument by providing symbol """
         # get instrument given exchange and symbol
         exchange = exchange.upper()
         # check if master contract exists
@@ -752,7 +833,10 @@ class AliceBlue:
         return master_contract[symbol]
     
     def get_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE = False, exchange = 'NFO'):
+        """ get instrument for FNO """
         res = self.search_instruments(exchange, symbol)
+        if(res == None):
+            return
         matches = []
         for i in res:
             if(i.expiry == expiry_date):
@@ -773,6 +857,7 @@ class AliceBlue:
                                 return i
                             
     def search_instruments(self, exchange, symbol):
+        """ Search instrument by symbol match """
         # search instrument given exchange and symbol
         exchange = exchange.upper()
         matches = []
@@ -783,11 +868,17 @@ class AliceBlue:
             return None
         master_contract = self.__master_contracts_by_token[exchange]
         for contract in master_contract:
-            if symbol == master_contract[contract].symbol.split(' ')[0]:
-                matches.append(master_contract[contract])
+            if (isinstance(symbol, list)):
+                for sym in symbol:
+                    if sym.lower() in master_contract[contract].symbol.split(' ')[0].lower():
+                        matches.append(master_contract[contract])
+            else:
+                if symbol.lower() in master_contract[contract].symbol.split(' ')[0].lower():
+                    matches.append(master_contract[contract])
         return matches
 
     def get_instrument_by_token(self, exchange, token):
+        """ Get instrument by providing token """
         # get instrument given exchange and token
         exchange = exchange.upper()
         token = int(token)
@@ -803,6 +894,7 @@ class AliceBlue:
         return master_contract[token]
 
     def get_master_contract(self, exchange):
+        """ Get master contract """
         return self.__master_contracts_by_symbol[exchange]
 
     def __get_master_contract(self, exchange):
