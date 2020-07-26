@@ -1,7 +1,7 @@
 
-# Python SDK for Alice Blue API
+# Official Python SDK for Alice Blue API
 
-The Python library for communicating with the Alice Blue APIs.
+The Official Python library for communicating with the Alice Blue APIs.
 
 Alice Blue Python library provides an easy to use wrapper over the HTTPs APIs.
 
