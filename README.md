@@ -1,16 +1,17 @@
 
-# Python SDK for Alice Blue API
+# Official Python SDK for Alice Blue API
 
-The Python library for communicating with the Alice Blue APIs.
+The Official Python library for communicating with the Alice Blue APIs.
 
-Alice Blue Python library provides an easy to use wrapper over the HTTPs APIs.
+Alice Blue Python library provides an easy to use wrapper over the HTTPS APIs.
 
 The HTTP calls have been converted to methods and JSON responses are wrapped into Python-compatible objects.
 
-Websocket connections are handled automatically within the library
+Websocket connections are handled automatically within the library.
 
-* Author: [krishnavelu](https://github.com/krishnavelu/)
+* __Author: [krishnavelu](https://github.com/krishnavelu/)__
 * [Unofficed](https://www.unofficed.com/) is strategic partner of Alice Blue responsible for this git.
+* Alice Blue API trading is free for [Unofficed](https://www.unofficed.com/) members. Follow [this](https://unofficed.com/alice-blue/) to get API free.
 
 ## Installation
 
@@ -54,7 +55,7 @@ The original REST API that this SDK is based on is available online.
 
 ### Logging
 The whole library is equipped with python's `logging` moduele for debugging. If more debug information is needed, enable logging using the following code.
-  
+
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -62,8 +63,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### Get api_secret
 api_secret is unique for each and every account. You need to enable api trading and get api_secret from alice blue.
-Plesae [contact](https://www.aliceblueonline.com/contact-us/) alice blue for getting api_secret.
- 
+Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue for getting api_secret.
+
 ### Get an access token
 1. Import alice_blue
 ```python
@@ -174,7 +175,7 @@ Subscribe to multiple instruments in a single call. Give an array of instruments
 ```python
 alice.subscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get_instrument_by_symbol('NSE', 'ACC')], LiveFeedType.MARKET_DATA)
 ```
-Note: There is a limit of 250 scrips that can be subscribed on total. Beyond this point the server may disconnect web-socket connection. 
+Note: There is a limit of 250 scrips that can be subscribed on total. Beyond this point the server may disconnect web-socket connection.
 
 Start getting live feed via socket
 
@@ -561,9 +562,9 @@ Before creating an issue in this library, please follow the following steps.
 1. Search the problem you are facing is already asked by someone else. There might be some issues already there, either solved/unsolved related to your problem. Go to [issues](https://github.com/krishnavelu/alice_blue/issues) page, use `is:issue` as filter and search your problem. ![image](https://user-images.githubusercontent.com/38440742/85207058-376ee400-b2f4-11ea-91ad-c8fd8a682a12.png)
 2. If you feel your problem is not asked by anyone or no issues are related to your problem, then create a new issue.
 3. Describe your problem in detail while creating the issue. If you don't have time to detail/describe the problem you are facing, assume that I also won't be having time to respond to your problem.
-4. Post a sample code of the problem you are facing. If I copy paste the code directly from issue, I should be able to reproduce the problem you are facing. 
+4. Post a sample code of the problem you are facing. If I copy paste the code directly from issue, I should be able to reproduce the problem you are facing.
 5. Before posting the sample code, test your sample code yourself once. Only sample code should be tested, no other addition should be there while you are testing.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
 8. Use the insert code feature of github to inset code and print outputs, so that the code is displyed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
-9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are createing an issue.
+9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.

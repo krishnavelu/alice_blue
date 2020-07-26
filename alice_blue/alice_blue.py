@@ -839,8 +839,10 @@ class AliceBlue:
             return
         matches = []
         for i in res:
-            if(i.expiry == expiry_date):
-                matches.append(i)
+            sp = i.symbol.split(' ')
+            if(sp[0] == symbol):
+                if(i.expiry == expiry_date):
+                    matches.append(i)
         for i in matches:
             if(is_fut == True):
                 if('FUT' in i.symbol):
