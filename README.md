@@ -3,15 +3,15 @@
 
 The Official Python library for communicating with the Alice Blue APIs.
 
-Alice Blue Python library provides an easy to use wrapper over the HTTPs APIs.
+Alice Blue Python library provides an easy to use wrapper over the HTTPS APIs.
 
 The HTTP calls have been converted to methods and JSON responses are wrapped into Python-compatible objects.
 
-Websocket connections are handled automatically within the library
+Websocket connections are handled automatically within the library.
 
 * __Author: [krishnavelu](https://github.com/krishnavelu/)__
 * [Unofficed](https://www.unofficed.com/) is strategic partner of Alice Blue responsible for this git.
-* Alice Blue API trading is free for [Unofficed](https://www.unofficed.com/) members. Join [Unofficed](https://unofficed.com/chat/) forum and follow [this](https://unofficed.com/alice-blue/) to get API free.
+* Alice Blue API trading is free for [Unofficed](https://www.unofficed.com/) members. Follow [this](https://unofficed.com/alice-blue/) to get API free.
 
 ## Installation
 
@@ -567,4 +567,4 @@ Before creating an issue in this library, please follow the following steps.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
 8. Use the insert code feature of github to inset code and print outputs, so that the code is displyed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
-9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are createing an issue.
+9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.
