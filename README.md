@@ -567,4 +567,5 @@ Before creating an issue in this library, please follow the following steps.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
 8. Use the insert code feature of github to inset code and print outputs, so that the code is displyed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
-9. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.
+9. If you have multiple lines of code, use tripple [grave accent](https://docs.github.com/en/github/writing-on-github/creating-and-highlighting-code-blocks) ( ``` ) to insert multiple lines of code. Example: ![image](https://user-images.githubusercontent.com/38440742/89105781-343a3e00-d3f2-11ea-9f86-92dda88aa5bf.png)
+10. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.

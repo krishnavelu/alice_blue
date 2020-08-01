@@ -605,6 +605,13 @@ class AliceBlue:
                     raise TypeError("Element price in orders should be of type float")
             else:
                 i['price'] = 0.0
+            if i['order_type'] == OrderType.StopLossLimit or i['order_type'] == OrderType.StopLossMarket:
+                if 'trigger_price' not in i:
+                    raise TypeError(f"Each element in orders should have key 'trigger_price' if it is an {i['order_type']} order")
+                if not isinstance(i['trigger_price'], float):
+                    raise TypeError("Element trigger_price in orders should be of type float")
+            else:
+                i['trigger_price'] = 0.0
             if(i['product_type'] == ProductType.Intraday):
                 i['product_type'] = 'MIS'
             elif(i['product_type'] == ProductType.Delivery):
@@ -630,7 +637,7 @@ class AliceBlue:
                                    'disclosed_quantity' : 0,
                                    'price'              : i['price'],
                                    'transaction_type'   : i['transaction_type'].value,
-                                   'trigger_price'      : 0,
+                                   'trigger_price'      : i['trigger_price'],
                                    'validity'           : 'DAY',
                                    'product'            : i['product_type']})
 
