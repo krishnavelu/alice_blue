@@ -644,7 +644,7 @@ class AliceBlue:
         helper = 'place_basket_order'
         return self.__api_call_helper(helper, Requests.POST, None, data)
 
-    def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity=None, price=0.0,
+    def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity, price=0.0,
                      trigger_price=0.0):
         """ modify an order, transaction_type, instrument, product_type, order_id & order_type is required, 
             rest are optional, use only when when you want to change that attribute.
@@ -655,7 +655,7 @@ class AliceBlue:
         if not isinstance(order_id, str):
             raise TypeError("Required parameter order_id not of type str")
 
-        if quantity is not None and not isinstance(quantity, int):
+        if not isinstance(quantity, int):
             raise TypeError("Optional parameter quantity not of type int")
 
         if type(order_type) is not OrderType:
