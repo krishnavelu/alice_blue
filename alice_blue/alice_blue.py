@@ -483,6 +483,21 @@ class AliceBlue:
         """ Get enabled exchanges """
         return self.__enabled_exchanges
 
+    def __get_product_type_str(self, product_type, exchange):
+        prod_type = None
+        if(product_type == ProductType.Intraday):
+            prod_type = 'MIS'
+        elif(product_type == ProductType.Delivery):
+            if(exchange == 'NFO') or (exchange == 'MCX') or (exchange == 'CDS'):
+                prod_type = 'NRML'
+            else:
+                prod_type = 'CNC'
+        elif(product_type == ProductType.CoverOrder):
+            prod_type = 'CO'
+        elif(product_type == ProductType.BracketOrder):
+            prod_type = None
+        return prod_type
+
     def place_order(self, transaction_type, instrument, quantity, order_type,
                     product_type, price=0.0, trigger_price=None,
                     stop_loss=None, square_off=None, trailing_sl=None,
@@ -512,17 +527,7 @@ class AliceBlue:
         if trigger_price is not None and not isinstance(trigger_price, float):
             raise TypeError("Optional parameter trigger_price not of type float")
 
-        if(product_type == ProductType.Intraday):
-            prod_type = 'MIS'
-        elif(product_type == ProductType.Delivery):
-            if(instrument.exchange == 'NFO') or (instrument.exchange == 'MCX') or (instrument.exchange == 'CDS'):
-                prod_type = 'NRML'
-            else:
-                prod_type = 'CNC'
-        elif(product_type == ProductType.CoverOrder):
-            prod_type = 'CO'
-        elif(product_type == ProductType.BracketOrder):
-            prod_type = None
+        prod_type = self.__get_product_type_str(product_type, instrument.exchange)
         # construct order object after all required parameters are met
         order = {  'exchange': instrument.exchange,
                    'order_type': order_type.value,
@@ -612,17 +617,14 @@ class AliceBlue:
                     raise TypeError("Element trigger_price in orders should be of type float")
             else:
                 i['trigger_price'] = 0.0
-            if(i['product_type'] == ProductType.Intraday):
-                i['product_type'] = 'MIS'
-            elif(i['product_type'] == ProductType.Delivery):
-                if(i['instrument'].exchange == 'NFO'):
-                    i['product_type'] = 'NRML'
-                else:
-                    i['product_type'] = 'CNC'
-            elif(i['product_type'] == ProductType.CoverOrder):
-                raise TypeError("Product Type BO or CO is not supported in basket order")
+                
+            if(i['product_type'] == ProductType.CoverOrder):
+                raise TypeError("Product Type CO is not supported in basket order")
             elif(i['product_type'] == ProductType.BracketOrder):
-                raise TypeError("Product Type BO or CO is not supported in basket order")
+                raise TypeError("Product Type BO is not supported in basket order")
+            else:
+                i['product_type'] = self.__get_product_type_str(i['product_type'], i['instrument'].exchange)
+                
             if i['quantity'] <= 0:
                 raise TypeError("Quantity should be greater than 0")
 
@@ -670,17 +672,7 @@ class AliceBlue:
         if trigger_price is not None and not isinstance(trigger_price, float):
             raise TypeError("Optional parameter trigger_price not of type float")
 
-        if(product_type == ProductType.Intraday):
-            product_type = 'MIS'
-        elif(product_type == ProductType.Delivery):
-            if(instrument.exchange == 'NFO'):
-                product_type = 'NRML'
-            else:
-                product_type = 'CNC'
-        elif(product_type == ProductType.CoverOrder):
-            product_type = 'CO'
-        elif(product_type == ProductType.BracketOrder):
-            product_type = None
+        product_type = self.__get_product_type_str(product_type, instrument.exchange)
         # construct order object with order id
         order = {  'oms_order_id': str(order_id),  
                    'instrument_token': int(instrument.token),
