@@ -465,9 +465,9 @@ class AliceBlue:
     def get_order_history(self, order_id=None):
         """ leave order_id as None to get all entire order history """
         if order_id is None:
-            return self.__api_call_helper('get_orders', Requests.GET, None, None);
+            return self.__api_call_helper('get_orders', Requests.GET, None, None)
         else:
-            return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None);
+            return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None)
     
     def get_scrip_info(self, instrument):
         """ Get scrip information """
