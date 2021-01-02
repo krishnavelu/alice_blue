@@ -400,8 +400,7 @@ class AliceBlue:
         while self.__websocket_connected == False:
             sleep(0.05)  # sleep for 50ms if websocket is not connected, wait for reconnection
         with self.__ws_mutex:
-            ret = self.__websocket.send(*args, **kwargs)
-        return ret
+            self.__websocket.send(*args, **kwargs)
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -717,7 +716,7 @@ class AliceBlue:
 
     def subscribe_market_status_messages(self):
         """ Subscribe to market messages """
-        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
+        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
 
     def get_market_status_messages(self):
         """ Get market messages """
@@ -725,7 +724,7 @@ class AliceBlue:
     
     def subscribe_exchange_messages(self):
         """ Subscribe to exchange messages """
-        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
+        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
 
     def get_exchange_messages(self):
         """ Get stored exchange messages """
@@ -758,7 +757,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'subscribe', 'v' : arr, 'm' : mode})
-        return self.__ws_send(data)
+        self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
         """ unsubscribe to the current feed of an instrument """
@@ -787,7 +786,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'unsubscribe', 'v' : arr, 'm' : mode})
-        return self.__ws_send(data)
+        self.__ws_send(data)
 
     def get_all_subscriptions(self):
         """ get the all subscribed instruments """
