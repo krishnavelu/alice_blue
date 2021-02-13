@@ -76,6 +76,17 @@ from alice_blue import *
 access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='a',  api_secret='api_secret')
 ```
 
+### Problem getting access token
+If you are facing problem getting access token, make sure the following are correct.
+1. username
+1. password
+1. api secret
+1. app id (for some customers the app id is username itself, if its different pass the correct app id)
+1. Redirect URI (Note: default redirect uri is `https://ant.aliceblueonline.com/plugin/callback` if you have different than this, pass the correct redirect uri)
+1. Two factor authentication. Make sure the answers for all the questions are same ('a' or something else). If you have something different, make sure to pass the correct twoFA.
+
+Even after verifying all these, if you are facing problem, contact alice customer care. They should enable the API access in their end. Don't create a new issue in this library for OAuth Error.
+
 ### Create AliceBlue Object
 1. Once you have your `access_token`, you can create an AliceBlue object with your `access_token`, `username` and `password`.
 ```python
@@ -110,6 +121,8 @@ reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE')
 ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC')
 india_vix_nse_index = alice.get_instrument_by_symbol('NSE', 'India VIX')
 sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'SENSEX')
+nifty50_nse_index = alice.get_instrument_by_symbol('NSE', 'Nifty 50')
+banknifty_nse_index = alice.get_instrument_by_symbol('NSE', 'Nifty Bank')
 ```
 
 Get a single instrument by it's token number (generally useful only for BSE Equities):
