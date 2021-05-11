@@ -501,7 +501,8 @@ class AliceBlue:
                     product_type, price=0.0, trigger_price=None,
                     stop_loss=None, square_off=None, trailing_sl=None,
                     is_amo = False,
-                    order_tag = 'order1'):
+                    order_tag = 'order1',
+                    is_ioc = False):
         """ placing an order, many fields are optional and are not required
             for all order types
         """
@@ -536,7 +537,7 @@ class AliceBlue:
                    'price':price,
                    'transaction_type':transaction_type.value,
                    'trigger_price':trigger_price,
-                   'validity':'DAY',
+                   'validity':'DAY' if is_ioc == False else 'IOC',
                    'product':prod_type,
                    'source':'web',
                    'order_tag': order_tag}
