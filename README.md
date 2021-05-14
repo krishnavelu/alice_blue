@@ -66,7 +66,7 @@ api_secret is unique for each and every account. You need to enable api trading 
 1. Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue to get access to api.
 2. After you get a response from alice blue, login to [developer console](https://develop-api.aliceblueonline.com/dashboard)
 3. Click on 'Create App'
-4. Enter 'App Name' as you like. Enter 'Redirect URI' as 'http://develop-api.aliceblueonline.com/'
+4. Enter 'App Name' as you like. Enter 'Redirect URI' as `https://ant.aliceblueonline.com/plugin/callback`
 5. Click on 'Create App'
 6. Copy the 'App Id' and 'App Secret'. You will need these to generate access token.
 
@@ -78,7 +78,7 @@ from alice_blue import *
 
 2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA`, `app_id` and `api_secret`. Both 2FA should be same.
 ```python
-access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='2fA', api_secret='api_secret', app_id='app_id')
+access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='a', api_secret='api_secret', app_id='app_id')
 ```
 
 ### Create AliceBlue Object
@@ -572,5 +572,5 @@ Before creating an issue in this library, please follow the following steps.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
 8. Use the insert code feature of github to inset code and print outputs, so that the code is displayed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
-9. If you have multiple lines of code, use tripple grave accent ( ``` ) to insert multiple lines of code. [Example:](https://docs.github.com/en/github/writing-on-github/creating-and-highlighting-code-blocks) ![image](https://user-images.githubusercontent.com/38440742/89105781-343a3e00-d3f2-11ea-9f86-92dda88aa5bf.png)
+9. If you have multiple lines of code, use triple grave accent ( ``` ) to insert multiple lines of code. [Example:](https://docs.github.com/en/github/writing-on-github/creating-and-highlighting-code-blocks) ![image](https://user-images.githubusercontent.com/38440742/89105781-343a3e00-d3f2-11ea-9f86-92dda88aa5bf.png)
 10. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.
