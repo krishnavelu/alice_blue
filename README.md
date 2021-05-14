@@ -54,7 +54,7 @@ The original REST API that this SDK is based on is available online.
 ## Using the API
 
 ### Logging
-The whole library is equipped with python's `logging` moduele for debugging. If more debug information is needed, enable logging using the following code.
+The whole library is equipped with python's `logging` module for debugging. If more debug information is needed, enable logging using the following code.
 
 ```python
 import logging
@@ -63,7 +63,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### Get api_secret
 api_secret is unique for each and every account. You need to enable api trading and get api_secret from alice blue.
-Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue for getting api_secret.
+1. Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue to get access to api.
+2. After you get a response from alice blue, login to [developer console](https://develop-api.aliceblueonline.com/dashboard)
+3. Click on 'Create App'
+4. Enter 'App Name' as you like. Enter 'Redirect URI' as 'http://develop-api.aliceblueonline.com/'
+5. Click on 'Create App'
+6. Copy the 'App Id' and 'App Secret'. You will need these to generate access token.
 
 ### Get an access token
 1. Import alice_blue
@@ -71,9 +76,9 @@ Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue for get
 from alice_blue import *
 ```
 
-2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA` and `api_secret`
+2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA`, `app_id` and `api_secret`. Both 2FA should be same.
 ```python
-access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='a',  api_secret='api_secret')
+access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='2fA', api_secret='api_secret', app_id='app_id')
 ```
 
 ### Create AliceBlue Object
@@ -93,7 +98,7 @@ print(alice.get_holding_positions()) # get holding positions
 
 ### Get master contracts
 Getting master contracts allow you to search for instruments by symbol name and place orders.
-Master contracts are stored as an OrderedDict by token number and by symbol name. Whenever you get a trade update, order update, or quote update, the library will check if master contracts are loaded. If they are, it will attach the instrument object directly to the update. By default all master contracts of all enabled exchanges in your personal profile will be downloaded. i.e. If your profile contains the folowing as enabled exchanges `['NSE', 'BSE', 'MCX', NFO']` all contract notes of all exchanges will be downloaded by default. If you feel it takes too much time to download all exchange, or if you don't need all exchanges to be downloaded, you can specify which exchange to download contract notes while creating the AliceBlue object.
+Master contracts are stored as an OrderedDict by token number and by symbol name. Whenever you get a trade update, order update, or quote update, the library will check if master contracts are loaded. If they are, it will attach the instrument object directly to the update. By default all master contracts of all enabled exchanges in your personal profile will be downloaded. i.e. If your profile contains the following as enabled exchanges `['NSE', 'BSE', 'MCX', NFO']` all contract notes of all exchanges will be downloaded by default. If you feel it takes too much time to download all exchange, or if you don't need all exchanges to be downloaded, you can specify which exchange to download contract notes while creating the AliceBlue object.
 
 ```python
 alice = AliceBlue(username='username', password='password', access_token=access_token, master_contracts_to_download=['NSE', 'BSE'])
@@ -228,7 +233,7 @@ Example result of `get_market_status_messages()`
 ```
 [{'exchange': 'NSE', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 31, 'status': b'The Closing Session has closed.'}, {'exchange': 'NFO', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'CDS', 'length_of_market_type': 6, 'market_type': b'NORMAL', 'length_of_status': 45, 'status': b'The Normal market has closed for 22 MAY 2020.'}, {'exchange': 'BSE', 'length_of_market_type': 13, 'market_type': b'OTHER SESSION', 'length_of_status': 0, 'status': b''}]
 ```
-Note: As per `alice blue` [documention](http://antplus.aliceblueonline.com/#market-status) all market status messages should be having a timestamp. But in actual the server does't send timestamp, so the library is unable to get timestamp for now.
+Note: As per `alice blue` [documentation](http://antplus.aliceblueonline.com/#market-status) all market status messages should be having a timestamp. But in actual the server doesn't send timestamp, so the library is unable to get timestamp for now.
 
 Subscribe to exchange messages
 ```python
@@ -566,6 +571,6 @@ Before creating an issue in this library, please follow the following steps.
 5. Before posting the sample code, test your sample code yourself once. Only sample code should be tested, no other addition should be there while you are testing.
 6. Have some print() function calls to display the values of some variables related to your problem.
 7. Post the results of print() functions also in the issue.
-8. Use the insert code feature of github to inset code and print outputs, so that the code is displyed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
+8. Use the insert code feature of github to inset code and print outputs, so that the code is displayed neat. ![image](https://user-images.githubusercontent.com/38440742/85207234-4dc96f80-b2f5-11ea-990c-df013dd69cf2.png)
 9. If you have multiple lines of code, use tripple grave accent ( ``` ) to insert multiple lines of code. [Example:](https://docs.github.com/en/github/writing-on-github/creating-and-highlighting-code-blocks) ![image](https://user-images.githubusercontent.com/38440742/89105781-343a3e00-d3f2-11ea-9f86-92dda88aa5bf.png)
 10. [Here](https://github.com/krishnavelu/alice_blue/issues/134#issuecomment-647016659) is an example of what I'm expecting while you are creating an issue.
