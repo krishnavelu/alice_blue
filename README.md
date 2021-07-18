@@ -268,6 +268,31 @@ alice.subscribe_market_status_messages()
 alice.subscribe_exchange_messages()
 sleep(10)
 ```
+### for LTP
+```python
+
+def event_handler_quote_update(message):
+    global ltp
+    ltp = message['ltp']
+
+def open_callback():
+    global socket_opened
+    socket_opened = True
+
+def getltp(instrument):
+    global socket_opened
+    socket_opened = False
+    alice.start_websocket(subscribe_callback=event_handler_quote_update, socket_open_callback=open_callback, run_in_background=True)
+    while(socket_opened==False):    # wait till socket open & then subscribe
+        pass
+    alice.subscribe(instrument, LiveFeedType.COMPACT)
+    time.sleep(1)
+    socket_opened = False
+    alice.unsubscribe(instrument, LiveFeedType.COMPACT)
+    return ltp
+
+
+```
 
 ### Place an order
 Place limit, market, SL, SL-M, AMO, BO, CO orders
