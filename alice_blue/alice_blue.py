@@ -16,7 +16,6 @@ Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
 logger = logging.getLogger(__name__)
 
-
 class Requests(enum.Enum):
     PUT = 1
     DELETE = 2
@@ -254,14 +253,12 @@ class AliceBlue:
             logger.error("Got Internal server error, please try again after sometimes")
             return
         question_ids = []
-
         page = BeautifulSoup(resp.text, features="html.parser")
         err = page.find('p', attrs={'class':'error'})
         if(len(err) > 0):
             logger.error(f"Couldn't login {err}")
             return
-        questions = page.find_all('input', attrs={'name': 'question_id1'})
-        for i in questions:
+        for i in page.find_all('input', attrs={'name': 'question_id1'}):
             question_ids.append(i['value'])
 
         questions = page.find_all('p', attrs={'class': 'twofa'})

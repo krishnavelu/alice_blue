@@ -72,6 +72,23 @@ from alice_blue import *
 ```
 
 2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA` and `api_secret`
+    - Using authenticator:
+    ```python
+    class Authenticator:
+        def __init__(self, username, api_secret):
+            self.username = username
+            self.api_secret = api_secret
+        
+        def get_password(self):
+            return "my_pwd"
+
+        def get_twoFA(self):
+            return ['a1', 'a2']
+
+    auth = Authenticator('user', 'api_sec')
+    accesstoken = AliceBlue.login_and_get_access_token(auth)
+    ```
+    - Using direct method:
 ```python
 access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='a',  api_secret='api_secret')
 ```
