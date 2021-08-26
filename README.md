@@ -82,7 +82,8 @@ from alice_blue import *
         def get_password(self):
             return "my_pwd"
 
-        def get_twoFA(self):
+        def get_twoFA(self, questions):
+	    # use questions and answer them
             return ['a1', 'a2']
 
     auth = Authenticator('user', 'api_sec')
