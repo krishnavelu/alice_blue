@@ -10,10 +10,12 @@ from bs4 import BeautifulSoup
 from collections import OrderedDict
 from protlib import CUInt, CStruct, CULong, CUChar, CArray, CUShort, CString
 from collections import namedtuple
+from authenticator import Autheticator
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
 logger = logging.getLogger(__name__)
+
 
 class Requests(enum.Enum):
     PUT = 1
@@ -171,11 +173,10 @@ class AliceBlue:
       'socket_endpoint': 'wss://ant.aliceblueonline.com/hydrasocket/v2/websocket?access_token={access_token}'
     }
 
-    def __init__(self, username, password, access_token, master_contracts_to_download = None):
+    def __init__(self, username, access_token, master_contracts_to_download = None):
         """ logs in and gets enabled exchanges and products for user """
         self.__access_token = access_token
         self.__username = username
-        self.__password = password
         self.__websocket = None
         self.__websocket_connected = False
         self.__ws_mutex = threading.Lock()
@@ -223,9 +224,15 @@ class AliceBlue:
                 self.__get_master_contract(e)
         self.ws_thread = None
 
+
     @staticmethod
-    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
+    def login_and_get_access_token(auth:Autheticator, redirect_url='https://ant.aliceblueonline.com/plugin/callback'):
         """ Login and get access token """
+        username = auth.username
+        api_secret = auth.api_secret
+        app_id = auth.app_id
+        password = auth.get_password()
+
         #Get the Code
         if(app_id is None):
             app_id = username
@@ -247,13 +254,19 @@ class AliceBlue:
             logger.error("Got Internal server error, please try again after sometimes")
             return
         question_ids = []
+
         page = BeautifulSoup(resp.text, features="html.parser")
         err = page.find('p', attrs={'class':'error'})
         if(len(err) > 0):
             logger.error(f"Couldn't login {err}")
             return
-        for i in page.find_all('input', attrs={'name':'question_id1'}):
+        questions = page.find_all('input', attrs={'name': 'question_id1'})
+        for i in questions:
             question_ids.append(i['value'])
+
+        questions = page.find_all('p', attrs={'class': 'twofa'})
+        twoFA = auth.get_twoFA(questions)
+
         logger.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
         resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('consent_challenge' in resp.url):
