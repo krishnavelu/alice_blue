@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from collections import OrderedDict
 from protlib import CUInt, CStruct, CULong, CUChar, CArray, CUShort, CString
 from collections import namedtuple
-from authenticator import Autheticator
+from .authenticator import Autheticator
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
