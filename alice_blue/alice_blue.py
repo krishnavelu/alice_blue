@@ -265,7 +265,7 @@ class AliceBlue:
         twoFA = auth.get_twoFA(questions)
 
         logger.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
-        resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
+        resp = r.post(resp.url,data={'answer1':twoFA[0],'question_id1':question_ids,'answer2':twoFA[1],'login_challenge':login_challenge,'_csrf_token':csrf_token})
         if('consent_challenge' in resp.url):
             logger.info("Authorizing app for the first time")
             page = BeautifulSoup(resp.text, features="html.parser")
