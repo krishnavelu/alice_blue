@@ -365,8 +365,12 @@ class AliceBlue:
             if(self.__exchange_messages_callback is not None):
                 self.__exchange_messages_callback(res)
          
-    def __on_close_callback(self, ws=None):
+    def __on_close_callback(self, *arguments, **keywords):
         self.__websocket_connected = False
+        for i in range(len(arguments)):
+            logger.warning(f"__on_close_callback argument {i} - {arguments[i]}")
+        for kw in keywords:
+            logger.warning(f"__on_close_callback keyword argument {kw} : {keywords[kw]}")
         if self.__on_disconnect:
             self.__on_disconnect()
 
