@@ -254,8 +254,7 @@ class AliceBlue:
             return
         for i in page.find_all('input', attrs={'name':'question_id1'}):
             question_ids.append(i['value'])
-        logger.info(f"Assuming answers for all 2FA questions are '{twoFA}', Please change it to '{twoFA}' if not")
-        resp = r.post(resp.url,data={'answer1':twoFA,'question_id1':question_ids,'answer2':twoFA,'login_challenge':login_challenge,'_csrf_token':csrf_token})
+        resp = r.post(resp.url, data = {'answer1':twoFA, 'question_id1':question_ids, 'login_challenge':login_challenge, '_csrf_token':csrf_token})
         if('consent_challenge' in resp.url):
             logger.info("Authorizing app for the first time")
             page = BeautifulSoup(resp.text, features="html.parser")

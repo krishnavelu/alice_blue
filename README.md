@@ -76,9 +76,9 @@ api_secret is unique for each and every account. You need to enable api trading 
 from alice_blue import *
 ```
 
-2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA`, `app_id` and `api_secret`. Both 2FA should be same. If possible set both 2FA to 'a' as in example.
+2. Create access_token using login_and_get_access_token() function  with your `username`, `password`, `2FA (2fa is now year of birth)`, `app_id` and `api_secret`.
 ```python
-access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='a', api_secret='api_secret', app_id='app_id')
+access_token = AliceBlue.login_and_get_access_token(username='username', password='password', twoFA='1860', api_secret='api_secret', app_id='app_id')
 ```
 
 ### Problem getting access token
