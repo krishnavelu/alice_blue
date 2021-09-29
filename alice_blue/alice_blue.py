@@ -602,7 +602,7 @@ class AliceBlue:
                     raise TypeError(f"Each element in orders should have key {s}")
                 if type(i[s]) is not keys[s]:  
                     raise TypeError(f"Element '{s}' in orders should be of type {keys[s]}")
-            if i['order_type'] == OrderType.Limit:
+            if i['order_type'] == OrderType.Limit or i['order_type'] == OrderType.StopLossLimit:
                 if "price" not in i:
                     raise TypeError("Each element in orders should have key 'price' if its a limit order ")
                 if not isinstance(i['price'], float):
