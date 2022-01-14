@@ -647,7 +647,7 @@ class AliceBlue:
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity, price=0.0,
                      trigger_price=0.0):
-        """ modify an order, transaction_type, instrument, product_type, order_id & order_type is required, 
+        """ modify an order, transaction_type, instrument, product_type, order_id, order_type & quantity is required, 
             rest are optional, use only when when you want to change that attribute.
         """
         if not isinstance(instrument, Instrument):
