@@ -375,7 +375,7 @@ class AliceBlue:
             if(self.__exchange_messages_callback is not None):
                 self.__exchange_messages_callback(res)
          
-    def __on_close_callback(self, ws=None):
+    def __on_close_callback(self, *arguments, **keywords):
         self.__websocket_connected = False
         if self.__on_disconnect:
             self.__on_disconnect()
@@ -410,8 +410,7 @@ class AliceBlue:
         while self.__websocket_connected == False:
             sleep(0.05)  # sleep for 50ms if websocket is not connected, wait for reconnection
         with self.__ws_mutex:
-            ret = self.__websocket.send(*args, **kwargs)
-        return ret
+            self.__websocket.send(*args, **kwargs)
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
@@ -476,9 +475,9 @@ class AliceBlue:
     def get_order_history(self, order_id=None):
         """ leave order_id as None to get all entire order history """
         if order_id is None:
-            return self.__api_call_helper('get_orders', Requests.GET, None, None);
+            return self.__api_call_helper('get_orders', Requests.GET, None, None)
         else:
-            return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None);
+            return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None)
     
     def get_scrip_info(self, instrument):
         """ Get scrip information """
@@ -512,7 +511,8 @@ class AliceBlue:
                     product_type, price=0.0, trigger_price=None,
                     stop_loss=None, square_off=None, trailing_sl=None,
                     is_amo = False,
-                    order_tag = 'order1'):
+                    order_tag = 'order1',
+                    is_ioc = False):
         """ placing an order, many fields are optional and are not required
             for all order types
         """
@@ -547,7 +547,7 @@ class AliceBlue:
                    'price':price,
                    'transaction_type':transaction_type.value,
                    'trigger_price':trigger_price,
-                   'validity':'DAY',
+                   'validity':'DAY' if is_ioc == False else 'IOC',
                    'product':prod_type,
                    'source':'web',
                    'order_tag': order_tag}
@@ -613,7 +613,7 @@ class AliceBlue:
                     raise TypeError(f"Each element in orders should have key {s}")
                 if type(i[s]) is not keys[s]:  
                     raise TypeError(f"Element '{s}' in orders should be of type {keys[s]}")
-            if i['order_type'] == OrderType.Limit:
+            if i['order_type'] == OrderType.Limit or i['order_type'] == OrderType.StopLossLimit:
                 if "price" not in i:
                     raise TypeError("Each element in orders should have key 'price' if its a limit order ")
                 if not isinstance(i['price'], float):
@@ -658,7 +658,7 @@ class AliceBlue:
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity, price=0.0,
                      trigger_price=0.0):
-        """ modify an order, transaction_type, instrument, product_type, order_id & order_type is required, 
+        """ modify an order, transaction_type, instrument, product_type, order_id, order_type & quantity is required, 
             rest are optional, use only when when you want to change that attribute.
         """
         if not isinstance(instrument, Instrument):
@@ -727,7 +727,7 @@ class AliceBlue:
 
     def subscribe_market_status_messages(self):
         """ Subscribe to market messages """
-        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
+        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
 
     def get_market_status_messages(self):
         """ Get market messages """
@@ -735,7 +735,7 @@ class AliceBlue:
     
     def subscribe_exchange_messages(self):
         """ Subscribe to exchange messages """
-        return self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
+        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
 
     def get_exchange_messages(self):
         """ Get stored exchange messages """
@@ -768,7 +768,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'subscribe', 'v' : arr, 'm' : mode})
-        return self.__ws_send(data)
+        self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
         """ unsubscribe to the current feed of an instrument """
@@ -797,7 +797,7 @@ class AliceBlue:
         elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
             mode = 'full_snapquote' 
         data = json.dumps({'a' : 'unsubscribe', 'v' : arr, 'm' : mode})
-        return self.__ws_send(data)
+        self.__ws_send(data)
 
     def get_all_subscriptions(self):
         """ get the all subscribed instruments """
