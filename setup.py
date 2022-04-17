@@ -6,14 +6,14 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name = 'alice_blue',
     packages=setuptools.find_packages(),
-    version = '1.0.3',
+    version = '1.0.4',
     include_package_data=True,
     description = 'Official Python library for Alice Blue APIs',
     long_description=long_description,
     long_description_content_type="text/markdown",  author = 'Krishna Velu',
     author_email = 'krishnajvelu@gmail.com',
     url = 'https://github.com/krishnavelu/alice_blue',
-    install_requires=['requests', 'websocket_client', 'bs4', 'protlib'],
+    install_requires=['requests', 'websocket_client', 'bs4'],
     keywords = ['alice', 'alice-blue', 'python', 'sdk', 'trading', 'stock markets'],
     python_requires='>=3.6',
     classifiers=[

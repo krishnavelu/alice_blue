@@ -33,7 +33,6 @@ Python 3.x
 
 Also, you need the following modules:
 
-* `protlib`
 * `websocket_client`
 * `requests`
 * `bs4`
