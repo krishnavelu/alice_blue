@@ -5,21 +5,21 @@ import websocket
 import logging
 import enum
 import datetime
+import struct
 from time import sleep
 from bs4 import BeautifulSoup
 from collections import OrderedDict
-from protlib import CUInt, CStruct, CULong, CUChar, CArray, CUShort, CString
 from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
 logger = logging.getLogger(__name__)
 
-class Requests(enum.Enum):
-    PUT = 1
-    DELETE = 2
-    GET = 3
-    POST = 4
+class Requests(enum.IntEnum):
+    PUT     = 1
+    DELETE  = 2
+    GET     = 3
+    POST    = 4
 
 class TransactionType(enum.Enum):
     Buy = 'BUY'
@@ -37,11 +37,11 @@ class ProductType(enum.Enum):
     CoverOrder = 'CO'
     BracketOrder = 'BO'
 
-class LiveFeedType(enum.Enum):
-    MARKET_DATA = 1
-    COMPACT = 2
-    SNAPQUOTE = 3
-    FULL_SNAPQUOTE = 4
+class LiveFeedType(enum.IntEnum):
+    MARKET_DATA     = 1
+    COMPACT         = 2
+    SNAPQUOTE       = 3
+    FULL_SNAPQUOTE  = 4
 
 class WsFrameMode(enum.IntEnum):
     MARKETDATA          =    1
@@ -55,91 +55,136 @@ class WsFrameMode(enum.IntEnum):
     MARKET_STATUS       =    9
     EXCHANGE_MESSAGES   =    10
     
-class MarketData(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    ltp = CUInt()
-    ltt = CUInt()
-    ltq = CUInt()
-    volume = CUInt()
-    best_bid_price = CUInt()
-    best_bid_quantity = CUInt()
-    best_ask_price = CUInt()
-    best_ask_quantity = CUInt()
-    total_buy_quantity = CULong()
-    total_sell_quantity = CULong()
-    atp = CUInt()
-    exchange_time_stamp = CUInt()
-    open = CUInt()
-    high = CUInt()
-    low = CUInt()
-    close = CUInt()
-    yearly_high = CUInt()
-    yearly_low = CUInt()
+class MarketData():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIIIIIIIIILLIIIIIIII"
+        res = struct.unpack_from(format_str, data)
+        return {"exchange"              : res[0],
+                "token"                 : res[1],
+                "ltp"                   : res[2],
+                "ltt"                   : res[3],
+                "ltq"                   : res[4],
+                "volume"                : res[5],
+                "best_bid_price"        : res[6],
+                "best_bid_quantity"     : res[7],
+                "best_ask_price"        : res[8],
+                "best_ask_quantity"     : res[9],
+                "total_buy_quantity"    : res[10],
+                "total_sell_quantity"   : res[11],
+                "atp"                   : res[12],
+                "exchange_time_stamp"   : res[13],
+                "open"                  : res[14],
+                "high"                  : res[15],
+                "low"                   : res[16],
+                "close"                 : res[17],
+                "yearly_high"           : res[18],
+                "yearly_low"            : res[19]}
         
-class CompactData(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    ltp = CUInt()
-    change = CUInt()
-    exchange_time_stamp = CUInt()
-    volume = CUInt()
+class CompactData():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIIIII"
+        res = struct.unpack_from(format_str, data)
+        return {"exchange"              : res[0],
+                "token"                 : res[1],
+                "ltp"                   : res[2],
+                "change"                : res[3],
+                "exchange_time_stamp"   : res[4],
+                "volume"                : res[5]}
      
-class SnapQuote(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    buyers = CArray(5, CUInt)
-    bid_prices = CArray(5, CUInt)
-    bid_quantities = CArray(5, CUInt)
-    sellers = CArray(5, CUInt)
-    ask_prices = CArray(5, CUInt)
-    ask_quantities = CArray(5, CUInt)
-    exchange_time_stamp = CUInt()
+class SnapQuote():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+        res = struct.unpack_from(format_str, data)
+        return {"exchange"              : res[0],
+                "token"                 : res[1],
+                "buyers"                : [res[2], res[3], res[4], res[5], res[6]],
+                "bid_prices"            : [res[7], res[8], res[9], res[10], res[11]],
+                "bid_quantities"        : [res[12], res[13], res[14], res[15], res[16]],
+                "sellers"               : [res[17], res[18], res[19], res[20], res[21]],
+                "ask_prices"            : [res[22], res[23], res[24], res[25], res[26]],
+                "ask_quantities"        : [res[27], res[28], res[29], res[30], res[31]],
+                "exchange_time_stamp"   : res[32]}
  
-class FullSnapQuote(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    buyers = CArray(5, CUInt)
-    bid_prices = CArray(5, CUInt)
-    bid_quantities = CArray(5, CUInt)
-    sellers = CArray(5, CUInt)
-    ask_prices = CArray(5, CUInt)
-    ask_quantities = CArray(5, CUInt)
-    atp = CUInt()
-    open = CUInt()
-    high = CUInt()
-    low = CUInt()
-    close = CUInt()
-    total_buy_quantity = CULong()
-    total_sell_quantity = CULong()
-    volume = CUInt()
+class FullSnapQuote():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIILLI"
+        res = struct.unpack_from(format_str, data)
+        return {"exchange"              : res[0],
+                "token"                 : res[1],
+                "buyers"                : [res[2], res[3], res[4], res[5], res[6]],
+                "bid_prices"            : [res[7], res[8], res[9], res[10], res[11]],
+                "bid_quantities"        : [res[12], res[13], res[14], res[15], res[16]],
+                "sellers"               : [res[17], res[18], res[19], res[20], res[21]],
+                "ask_prices"            : [res[22], res[23], res[24], res[25], res[26]],
+                "ask_quantities"        : [res[27], res[28], res[29], res[30], res[31]],
+                "atp"                   : res[32],
+                "open"                  : res[33],
+                "high"                  : res[34],
+                "low"                   : res[35],
+                "close"                 : res[36],
+                "total_buy_quantity"    : res[37],
+                "total_sell_quantity"   : res[38],
+                "volume"                : res[39]}
 
-class DPR(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    exchange_time_stamp = CUInt()
-    high = CUInt()
-    low = CUInt()
+class DPR():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIIII"
+        res = struct.unpack_from(format_str, data)
+        return {"exchange"              : res[0],
+                "token"                 : res[1],
+                "exchange_time_stamp"   : res[2],
+                "high"                  : res[3],
+                "low"                   : res[4]}
 
-class OpenInterest(CStruct):
-    exchange = CUChar()
-    token = CUInt()
-    current_open_interest = CUChar()
-    initial_open_interest = CUChar()
-    exchange_time_stamp = CUInt()
+class OpenInterest():
+    @staticmethod
+    def parse(data):
+        format_str = "!BIBBI"
+        res = struct.unpack_from(format_str, data)
+        exchange = res[0]
+        token = res[1]
+        current_open_interest = res[2]
+        initial_open_interest = res[3]
+        exchange_time_stamp = res[4]
+        return {"exchange"              : exchange,
+                "token"                 : token,
+                "current_open_interest" : current_open_interest,
+                "initial_open_interest" : initial_open_interest,
+                "exchange_time_stamp"   : exchange_time_stamp}
 
-class ExchangeMessage(CStruct):
-    exchange = CUChar()
-    length = CUShort()
-    message = CString(length = "length")
-    exchange_time_stamp = CUInt()
+class ExchangeMessage():
+    @staticmethod
+    def parse(data):
+        res = struct.unpack_from("!BH", data[:3])
+        exchange = res[0]
+        length = res[1]
+        res = struct.unpack_from(f"!BH{length}sI", data)
+        message = res[2]
+        exchange_time_stamp = res[3]
+        return {"exchange"              : exchange,
+                "length"                : length,
+                "message"               : message,
+                "exchange_time_stamp"   : exchange_time_stamp}
  
-class MarketStatus(CStruct):
-    exchange = CUChar()
-    length_of_market_type = CUShort()
-    market_type = CString(length = "length_of_market_type")
-    length_of_status = CUShort()
-    status = CString(length = "length_of_status")
+class MarketStatus():
+    @staticmethod
+    def parse(data):
+        res = struct.unpack_from("!BH", data[:3])
+        exchange = res[0]
+        length_of_market_type = res[1]
+        res = struct.unpack_from(f"!BH{length_of_market_type}sH", data[:5+length_of_market_type])
+        length_of_status = res[3]
+        res = struct.unpack_from(f"!BH{length_of_market_type}sH{length_of_status}s", data)
+        market_type = res[2]
+        status = res[4]
+        return {"exchange"      : exchange,
+                "market_type"   : market_type,
+                "status"        : status}
 
 class AliceBlue:
     # dictionary object to hold settings
@@ -322,43 +367,43 @@ class AliceBlue:
         if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
             message = ws
         if(message[0] == WsFrameMode.MARKETDATA):
-            p = MarketData.parse(message[1:]).__dict__
+            p = MarketData.parse(message[1:])
             res = self.__modify_human_readable_values(p) 
             if(self.__subscribe_callback is not None):
                 self.__subscribe_callback(res)
         elif(message[0] == WsFrameMode.COMPACT_MARKETDATA):
-            p = CompactData.parse(message[1:]).__dict__
+            p = CompactData.parse(message[1:])
             res = self.__modify_human_readable_values(p) 
             if(self.__subscribe_callback is not None):
                 self.__subscribe_callback(res)
         elif(message[0] == WsFrameMode.SNAPQUOTE):
-            p = SnapQuote.parse(message[1:]).__dict__
+            p = SnapQuote.parse(message[1:])
             res = self.__modify_human_readable_values(p) 
             if(self.__subscribe_callback is not None):
                 self.__subscribe_callback(res)
         elif(message[0] == WsFrameMode.FULL_SNAPQUOTE):
-            p = FullSnapQuote.parse(message[1:]).__dict__
+            p = FullSnapQuote.parse(message[1:])
             res = self.__modify_human_readable_values(p)
             if(self.__subscribe_callback is not None):
                 self.__subscribe_callback(res)
         elif(message[0] == WsFrameMode.DPR):
-            p = DPR.parse(message[1:]).__dict__
+            p = DPR.parse(message[1:])
             res = self.__modify_human_readable_values(p) 
             if(self.__dpr_callback is not None):
                 self.__dpr_callback(res)
         elif(message[0] == WsFrameMode.OI):
-            p = OpenInterest.parse(message[1:]).__dict__
+            p = OpenInterest.parse(message[1:])
             res = self.__modify_human_readable_values(p) 
             if(self.__oi_callback is not None):
                 self.__oi_callback(res)
         elif(message[0] == WsFrameMode.MARKET_STATUS):
-            p = MarketStatus.parse(message[1:]).__dict__
+            p = MarketStatus.parse(message[1:])
             res = self.__modify_human_readable_values(p)
             self.__market_status_messages.append(res) 
             if(self.__market_status_messages_callback is not None):
                 self.__market_status_messages_callback(res)
         elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            p = ExchangeMessage.parse(message[1:]).__dict__
+            p = ExchangeMessage.parse(message[1:])
             res = self.__modify_human_readable_values(p)
             self.__exchange_messages.append(res) 
             if(self.__exchange_messages_callback is not None):
