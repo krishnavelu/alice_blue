@@ -213,7 +213,7 @@ class AliceBlue:
           'trade_book': '/api/v2/trade',
           'scripinfo': '/api/v2/scripinfo?exchange={exchange}&instrument_token={token}',
       },
-      'socket_endpoint': 'wss://ant.aliceblueonline.com/hydrasocket/v2/websocket?access_token={access_token}'
+      'socket_endpoint': 'wss://ant.aliceblueonline.com/ws/v1/feeds?token={access_token}'
     }
 
     def __init__(self, username, password, access_token, master_contracts_to_download = None):
