@@ -58,7 +58,7 @@ class WsFrameMode(enum.IntEnum):
 class MarketData():
     @staticmethod
     def parse(data):
-        format_str = "!BIIIIIIIIILLIIIIIIII"
+        format_str = "!BIIIIIIIIIQQIIIIIIII"
         res = struct.unpack_from(format_str, data)
         return {"exchange"              : res[0],
                 "token"                 : res[1],
@@ -111,7 +111,7 @@ class SnapQuote():
 class FullSnapQuote():
     @staticmethod
     def parse(data):
-        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIILLI"
+        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIQQI"
         res = struct.unpack_from(format_str, data)
         return {"exchange"              : res[0],
                 "token"                 : res[1],
