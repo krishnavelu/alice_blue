@@ -1,15 +1,20 @@
+from collections import OrderedDict, namedtuple
+from Crypto import Random
+from Crypto.Cipher import AES
+from time import sleep
+from urllib.parse import urlparse, parse_qs
+import base64
+import datetime
+import enum
+import hashlib
 import json
+import logging
+import os
+import pytz
 import requests
+import tempfile
 import threading
 import websocket
-import logging
-import enum
-import datetime
-import struct
-from time import sleep
-from bs4 import BeautifulSoup
-from collections import OrderedDict
-from collections import namedtuple
 
 Instrument = namedtuple('Instrument', ['exchange', 'token', 'symbol',
                                        'name', 'expiry', 'lot_size'])
@@ -26,201 +31,106 @@ class TransactionType(enum.Enum):
     Sell = 'SELL'
 
 class OrderType(enum.Enum):
-    Market = 'MARKET'
-    Limit = 'LIMIT'
+    Market = 'MKT'
+    Limit = 'L'
     StopLossLimit = 'SL'
     StopLossMarket = 'SL-M'
+    BracketOrder = "BO"
+    AfterMarketOrder = "AMO"
 
 class ProductType(enum.Enum):
-    Intraday = 'I'
-    Delivery = 'D'
-    CoverOrder = 'CO'
-    BracketOrder = 'BO'
+    Intraday = 0
+    Delivery = 1
 
 class LiveFeedType(enum.IntEnum):
-    MARKET_DATA     = 1
-    COMPACT         = 2
-    SNAPQUOTE       = 3
-    FULL_SNAPQUOTE  = 4
+    TICK_DATA     = 1
+    DEPTH_DATA      = 2
 
-class WsFrameMode(enum.IntEnum):
-    MARKETDATA          =    1
-    COMPACT_MARKETDATA  =    2
-    SNAPQUOTE           =    3
-    FULL_SNAPQUOTE      =    4
-    SPREADDATA          =    5
-    SPREAD_SNAPQUOTE    =    6
-    DPR                 =    7
-    OI                  =    8
-    MARKET_STATUS       =    9
-    EXCHANGE_MESSAGES   =    10
-    
-class MarketData():
-    @staticmethod
-    def parse(data):
-        format_str = "!BIIIIIIIIIQQIIIIIIII"
-        res = struct.unpack_from(format_str, data)
-        return {"exchange"              : res[0],
-                "token"                 : res[1],
-                "ltp"                   : res[2],
-                "ltt"                   : res[3],
-                "ltq"                   : res[4],
-                "volume"                : res[5],
-                "best_bid_price"        : res[6],
-                "best_bid_quantity"     : res[7],
-                "best_ask_price"        : res[8],
-                "best_ask_quantity"     : res[9],
-                "total_buy_quantity"    : res[10],
-                "total_sell_quantity"   : res[11],
-                "atp"                   : res[12],
-                "exchange_time_stamp"   : res[13],
-                "open"                  : res[14],
-                "high"                  : res[15],
-                "low"                   : res[16],
-                "close"                 : res[17],
-                "yearly_high"           : res[18],
-                "yearly_low"            : res[19]}
-        
-class CompactData():
-    @staticmethod
-    def parse(data):
-        format_str = "!BIIIII"
-        res = struct.unpack_from(format_str, data)
-        return {"exchange"              : res[0],
-                "token"                 : res[1],
-                "ltp"                   : res[2],
-                "change"                : res[3],
-                "exchange_time_stamp"   : res[4],
-                "volume"                : res[5]}
-     
-class SnapQuote():
-    @staticmethod
-    def parse(data):
-        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
-        res = struct.unpack_from(format_str, data)
-        return {"exchange"              : res[0],
-                "token"                 : res[1],
-                "buyers"                : [res[2], res[3], res[4], res[5], res[6]],
-                "bid_prices"            : [res[7], res[8], res[9], res[10], res[11]],
-                "bid_quantities"        : [res[12], res[13], res[14], res[15], res[16]],
-                "sellers"               : [res[17], res[18], res[19], res[20], res[21]],
-                "ask_prices"            : [res[22], res[23], res[24], res[25], res[26]],
-                "ask_quantities"        : [res[27], res[28], res[29], res[30], res[31]],
-                "exchange_time_stamp"   : res[32]}
- 
-class FullSnapQuote():
-    @staticmethod
-    def parse(data):
-        format_str = "!BIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIQQI"
-        res = struct.unpack_from(format_str, data)
-        return {"exchange"              : res[0],
-                "token"                 : res[1],
-                "buyers"                : [res[2], res[3], res[4], res[5], res[6]],
-                "bid_prices"            : [res[7], res[8], res[9], res[10], res[11]],
-                "bid_quantities"        : [res[12], res[13], res[14], res[15], res[16]],
-                "sellers"               : [res[17], res[18], res[19], res[20], res[21]],
-                "ask_prices"            : [res[22], res[23], res[24], res[25], res[26]],
-                "ask_quantities"        : [res[27], res[28], res[29], res[30], res[31]],
-                "atp"                   : res[32],
-                "open"                  : res[33],
-                "high"                  : res[34],
-                "low"                   : res[35],
-                "close"                 : res[36],
-                "total_buy_quantity"    : res[37],
-                "total_sell_quantity"   : res[38],
-                "volume"                : res[39]}
+class HistoricalDataType(enum.Enum):
+    Day = '1D'
+    Minute = '1'
 
-class DPR():
+class CryptoJsAES:
     @staticmethod
-    def parse(data):
-        format_str = "!BIIII"
-        res = struct.unpack_from(format_str, data)
-        return {"exchange"              : res[0],
-                "token"                 : res[1],
-                "exchange_time_stamp"   : res[2],
-                "high"                  : res[3],
-                "low"                   : res[4]}
+    def __pad(data):
+        BLOCK_SIZE = 16
+        length = BLOCK_SIZE - (len(data) % BLOCK_SIZE)
+        return data + (chr(length)*length).encode()
 
-class OpenInterest():
     @staticmethod
-    def parse(data):
-        format_str = "!BIBBI"
-        res = struct.unpack_from(format_str, data)
-        exchange = res[0]
-        token = res[1]
-        current_open_interest = res[2]
-        initial_open_interest = res[3]
-        exchange_time_stamp = res[4]
-        return {"exchange"              : exchange,
-                "token"                 : token,
-                "current_open_interest" : current_open_interest,
-                "initial_open_interest" : initial_open_interest,
-                "exchange_time_stamp"   : exchange_time_stamp}
+    def __unpad(data):
+        return data[:-(data[-1] if type(data[-1]) == int else ord(data[-1]))]
 
-class ExchangeMessage():
+    def __bytes_to_key(data, salt, output=48):
+        assert len(salt) == 8, len(salt)
+        data += salt
+        key = hashlib.md5(data).digest()
+        final_key = key
+        while len(final_key) < output:
+            key = hashlib.md5(key + data).digest()
+            final_key += key
+        return final_key[:output]
+
     @staticmethod
-    def parse(data):
-        res = struct.unpack_from("!BH", data[:3])
-        exchange = res[0]
-        length = res[1]
-        res = struct.unpack_from(f"!BH{length}sI", data)
-        message = res[2]
-        exchange_time_stamp = res[3]
-        return {"exchange"              : exchange,
-                "length"                : length,
-                "message"               : message,
-                "exchange_time_stamp"   : exchange_time_stamp}
- 
-class MarketStatus():
+    def encrypt(message, passphrase):
+        salt = Random.new().read(8)
+        key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32+16)
+        key = key_iv[:32]
+        iv = key_iv[32:]
+        aes = AES.new(key, AES.MODE_CBC, iv)
+        return base64.b64encode(b"Salted__" + salt + aes.encrypt(CryptoJsAES.__pad(message)))
+
     @staticmethod
-    def parse(data):
-        res = struct.unpack_from("!BH", data[:3])
-        exchange = res[0]
-        length_of_market_type = res[1]
-        res = struct.unpack_from(f"!BH{length_of_market_type}sH", data[:5+length_of_market_type])
-        length_of_status = res[3]
-        res = struct.unpack_from(f"!BH{length_of_market_type}sH{length_of_status}s", data)
-        market_type = res[2]
-        status = res[4]
-        return {"exchange"      : exchange,
-                "market_type"   : market_type,
-                "status"        : status}
+    def decrypt(encrypted, passphrase):
+        encrypted = base64.b64decode(encrypted)
+        assert encrypted[0:8] == b"Salted__"
+        salt = encrypted[8:16]
+        key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32+16)
+        key = key_iv[:32]
+        iv = key_iv[32:]
+        aes = AES.new(key, AES.MODE_CBC, iv)
+        return CryptoJsAES.__unpad(aes.decrypt(encrypted[16:]))
 
 class AliceBlue:
-    # dictionary object to hold settings
-    __service_config = {
-      'host': 'https://ant.aliceblueonline.com',
-      'routes': {
-          'authorize': '/oauth2/auth',
-          'access_token': '/oauth2/token',
-          'profile': '/api/v2/profile',
-          'master_contract': '/api/v2/contracts.json?exchanges={exchange}',
-          'holdings': '/api/v2/holdings',
-          'balance': '/api/v2/cashposition',
-          'positions_daywise': '/api/v2/positions?type=daywise',
-          'positions_netwise': '/api/v2/positions?type=netwise',
-          'positions_holdings': '/api/v2/holdings',
-          'place_order': '/api/v2/order',
-          'place_amo': '/api/v2/amo',
-          'place_bracket_order': '/api/v2/bracketorder',
-          'place_basket_order' : '/api/v2/basketorder',
-          'get_orders': '/api/v2/order',
-          'get_order_info': '/api/v2/order/{order_id}',
-          'modify_order': '/api/v2/order',
-          'cancel_order': '/api/v2/order?oms_order_id={order_id}&order_status=open',
-          'cancel_bo_order': '/api/v2/order?oms_order_id={order_id}&order_status=open&leg_order_indicator={leg_order_id}',
-          'cancel_co_order': '/api/v2/coverorder?oms_order_id={order_id}&order_status=open&leg_order_indicator={leg_order_id}',
-          'trade_book': '/api/v2/trade',
-          'scripinfo': '/api/v2/scripinfo?exchange={exchange}&instrument_token={token}',
-      },
-      'socket_endpoint': 'wss://ant.aliceblueonline.com/ws/v1/feeds?token={access_token}'
-    }
+    """ AliceBlue Class for all operations related to AliceBlue Server"""
 
-    def __init__(self, username, password, access_token, master_contracts_to_download = None):
-        """ logs in and gets enabled exchanges and products for user """
-        self.__access_token = access_token
+    # URLs
+    host = "https://a3.aliceblueonline.com/rest/AliceBlueAPIService"
+    __urls = {  "webLogin"              :   f"{host}/customer/webLogin",
+                "twoFA"                 :   f"{host}/sso/validAnswer",
+                "sessionID"             :   f"{host}/sso/getUserDetails",
+                "getEncKey"             :   f"{host}/customer/getEncryptionKey",
+                "authorizeVendor"       :   f"{host}/sso/authorizeVendor",
+                "apiGetEncKey"          :   f"{host}/api/customer/getAPIEncpkey",
+                "profile"               :   f"{host}/api/customer/accountDetails",
+                "placeOrder"            :   f"{host}/api/placeOrder/executePlaceOrder",
+                "logout"                :   f"{host}/api/customer/logout",
+                "logoutFromAllDevices"  :   f"{host}/api/customer/logOutFromAllDevice",
+                "fetchMWList"           :   f"{host}/api/marketWatch/fetchMWList",
+                "fetchMWScrips"         :   f"{host}/api/marketWatch/fetchMWScrips",
+                "addScripToMW"          :   f"{host}/api/marketWatch/addScripToMW",
+                "deleteMWScrip"         :   f"{host}/api/marketWatch/deleteMWScrip",
+                "scripDetails"          :   f"{host}/api/ScripDetails/getScripQuoteDetails",
+                "positions"             :   f"{host}/api/positionAndHoldings/positionBook",
+                "holdings"              :   f"{host}/api/positionAndHoldings/holdings",
+                "sqrOfPosition"         :   f"{host}/api/positionAndHoldings/sqrOofPosition",
+                "fetchOrder"            :   f"{host}/api/placeOrder/fetchOrderBook",
+                "fetchTrade"            :   f"{host}/api/placeOrder/fetchTradeBook",
+                "exitBracketOrder"      :   f"{host}/api/placeOrder/exitBracketOrder",
+                "modifyOrder"           :   f"{host}/api/placeOrder/modifyOrder",
+                "cancelOrder"           :   f"{host}/api/placeOrder/cancelOrder",
+                "orderHistory"          :   f"{host}/api/placeOrder/orderHistory",
+                "getRmsLimits"          :   f"{host}/api/limits/getRmsLimits",
+                "createWsSession"       :   f"{host}/api/ws/createSocketSess",
+                "history"               :   f"{host}/api/chart/history",
+                "master_contract"       :   "https://v2api.aliceblueonline.com/restpy/contract_master?exch={exchange}",
+                "ws"                    :   "wss://ws2.aliceblueonline.com/NorenWS/"
+            }
+
+    def __init__(self, username, session_id, master_contracts_to_download = None):
+        """ Create Alice Blue object, get enabled exchanges and products for user """
         self.__username = username
-        self.__password = password
+        self.__session_id = session_id
         self.__websocket = None
         self.__websocket_connected = False
         self.__ws_mutex = threading.Lock()
@@ -228,6 +138,7 @@ class AliceBlue:
         self.__on_disconnect = None
         self.__on_open = None
         self.__subscribe_callback = None
+        self.__order_tag = 1
         self.__order_update_callback = None
         self.__market_status_messages_callback = None
         self.__exchange_messages_callback = None
@@ -236,28 +147,13 @@ class AliceBlue:
         self.__subscribers = {}
         self.__market_status_messages = []
         self.__exchange_messages = []
-        self.__exchange_codes = {'NSE' : 1,
-                                 'NFO' : 2,
-                                 'CDS' : 3,
-                                 'MCX' : 4,
-                                 'BSE' : 6,
-                                 'BFO' : 7}
-        self.__exchange_price_multipliers = {1: 100,
-                                             2: 100,
-                                             3: 10000000,
-                                             4: 100,
-                                             6: 100,
-                                             7: 100}
+        # Initialize Depth data
+        self.__depth_data = {} 
 
         try:
-            profile = self.get_profile()
+            self.get_profile()
         except Exception as e:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
-        if(profile['status'] == 'error'):
-            if(profile['message'] == 'Not able to retrieve AccountInfoService'):     # Don't know why this error comes, but it safe to proceed further.
-                logger.warning("Couldn't get profile info - 'Not able to retrieve AccountInfoService'")
-            else:
-                raise Exception(f"Couldn't get profile info '{profile['message']}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
         if(master_contracts_to_download == None):
@@ -269,145 +165,270 @@ class AliceBlue:
         self.ws_thread = None
 
     @staticmethod
-    def login_and_get_access_token(username, password, twoFA, api_secret, redirect_url='https://ant.aliceblueonline.com/plugin/callback', app_id=None):
-        """ Login and get access token """
-        #Get the Code
-        if(app_id is None):
-            app_id = username
-        r = requests.Session()
-        config = AliceBlue.__service_config
-        url = f"{config['host']}{config['routes']['authorize']}?response_type=code&state=test_state&client_id={app_id}&redirect_uri={redirect_url}" 
-        resp = r.get(url)
-        if('OAuth 2.0 Error' in resp.text):
-            logger.error("OAuth 2.0 Error occurred. Please verify your api_secret")
-            return None
-        page = BeautifulSoup(resp.text, features="html.parser")
-        csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
-        login_challenge = page.find('input', attrs = {'name' : 'login_challenge'})['value']
-        resp = r.post(resp.url,data={'client_id':username,'password':password,'login_challenge':login_challenge,'_csrf_token':csrf_token})
-        if('Please Enter Valid Password' in resp.text):
-            logger.error("Please enter a valid password")
-            return
-        if('Internal server error' in resp.text):
-            logger.error("Got Internal server error, please try again after sometimes")
-            return
-        question_ids = []
-        page = BeautifulSoup(resp.text, features="html.parser")
-        err = page.find('p', attrs={'class':'error'})
-        if(len(err) > 0):
-            logger.error(f"Couldn't login {err}")
-            return
-        for i in page.find_all('input', attrs={'name':'question_id1'}):
-            question_ids.append(i['value'])
-        resp = r.post(resp.url, data = {'answer1':twoFA, 'question_id1':question_ids, 'login_challenge':login_challenge, '_csrf_token':csrf_token})
-        if('consent_challenge' in resp.url):
-            logger.info("Authorizing app for the first time")
-            page = BeautifulSoup(resp.text, features="html.parser")
-            csrf_token = page.find('input', attrs = {'name':'_csrf_token'})['value']
-            resp = r.post(url=resp.url,data={'_csrf_token':csrf_token, 'consent': "Authorize", "scopes": ""})
-            if('Internal server error' in resp.text):
-                logger.error(f"Getting 'Internal server error' while authorizing the app for the first time. Please login manually using the following url '{url}'")
-                return
-        code = resp.url[resp.url.index('=')+1:resp.url.index('&')]
+    def login_and_get_sessioID(username, password, twoFA, app_id, api_secret):
+        """ Login and get Session ID """
+        header = {"Content-Type" : "application/json"}
+        try:
+            dr = tempfile.gettempdir()
+            tmp_file = os.path.join(dr, "alice_blue_key_SP22017.json")
+            if(os.path.isfile(tmp_file) == True):
+                d = {}
+                with open(tmp_file, 'r') as fo:
+                    d = json.loads(fo.read())
+                if(len(d["session_id"])):
+                    # Try getting profile/account details
+                    data = {"userId" : username}
+                    hdr = { "Content-Type" : "application/json",
+                            "Authorization" : f"Bearer {username} {d['session_id']}"}
+                    r = requests.get(AliceBlue.__urls["profile"], headers=hdr, data=json.dumps(data))
+                    logging.info(f"Get Account details response {r.text}")
+                    if(r.status_code == 200):
+                        if("stat" not in r.json()):
+                            logging.info(f"Using stored session_id {d['session_id']}")
+                            return d['session_id']
+            with open(tmp_file, 'w') as fo:
+                d = {"session_id" : ""}
+                fo.write(json.dumps(d))
+        except Exception as e:
+            logging.warn(f"Getting session_id from temp file ended in exception {e}")
+        # Get Encryption Key
+        data = {"userId" : username}
+        r = requests.post(AliceBlue.__urls['getEncKey'], headers=header, json=data)
+        logging.info(f"Get Encryption Key response {r.text}")
+        encKey = r.json()["encKey"]
 
-        #Get Access Token
-        params = {'code': code, 'redirect_uri': redirect_url, 'grant_type': 'authorization_code', 'client_secret' : api_secret, "cliend_id": username}
-        url = f"{config['host']}{config['routes']['access_token']}?client_id={app_id}&client_secret={api_secret}&grant_type=authorization_code&code={code}&redirect_uri={redirect_url}&authorization_response={resp.url}"
-        resp = r.post(url,auth=(app_id, api_secret),data=params)
-        resp = json.loads(resp.text)
-        if('access_token' in resp):
-            access_token = resp['access_token']
-            logger.info(f'access_token - {access_token}')
-            return access_token
-        else:
-            logger.error(f"Couldn't get access token {resp}")
-        return None
+        # Web Login
+        checksum = CryptoJsAES.encrypt(password.encode(), encKey.encode())
+        data = {"userId" : username,
+                "userData" : checksum}
+        r = requests.post(AliceBlue.__urls["webLogin"], json=data)
+        logging.info(f"Web Login response {r.text}")
 
-    def __convert_prices(self, dictionary, multiplier):
-        keys = ['ltp', 
-                'best_bid_price',
-                'best_ask_price',
-                'atp',
-                'open',
-                'high',
-                'low',
-                'close',
-                'yearly_high',
-                'yearly_low']
-        for key in keys:
-            if(key in dictionary):
-                dictionary[key] = dictionary[key]/multiplier
-        multiple_value_keys = ['bid_prices', 'ask_prices']
-        for key in multiple_value_keys:
-            if(key in dictionary):
-                new_values = []
-                for value in dictionary[key]:
-                    new_values.append(value/multiplier)
-                dictionary[key] = new_values
-        return dictionary
+        # Web Login 2FA
+        data = {"answer1" : twoFA,
+                "sCount" : "1",
+                "sIndex" : "1",
+                "userId" : username,
+                "vendor" : app_id}
+        r = requests.post(AliceBlue.__urls["twoFA"], json=data)
+        logging.info(f"Web Login 2FA response {r.text}")
+        isAuthorized = r.json()['isAuthorized']
+        authCode = parse_qs(urlparse(r.json()["redirectUrl"]).query)['authCode'][0]
+        logging.info(f"isAuthorized {isAuthorized}")
+        logging.info(f"authCode {authCode}")
+
+        # Get API Encryption Key
+        data = {"userId" : username}
+        r = requests.post(AliceBlue.__urls["apiGetEncKey"], headers=header, data=json.dumps(data))
+        logging.info(f"Get API Encryption Key response {r.text}")
+
+        # Get User Details/Session ID
+        checksum = hashlib.sha256(f"{username}{authCode}{api_secret}".encode()).hexdigest()
+        data = {"checkSum" : checksum}
+        r = requests.post(AliceBlue.__urls["sessionID"], headers=header, data=json.dumps(data))
+        logging.info(f"Session ID response {r.text}")
+        session_id = r.json()['userSession']
+        logging.info(f"Session ID is {session_id}")
+
+        # Authorize vendor app
+        if(isAuthorized == False):
+            data = {"userId" : username,
+                    "vendor" : app_id}
+            print("Authorizing vendor app")
+            r = requests.post(AliceBlue.__urls["authorizeVendor"], headers=header, data=json.dumps(data))
+
+        # Write session_id in temp file for next time usage
+        with open(tmp_file, 'w') as fo:
+            d = {"session_id" : session_id}
+            fo.write(json.dumps(d))
+        return session_id
+
+    def __extract_tick_data(self, data):
+        if("tk" in data):               # Token
+            data["instrument"] = self.get_instrument_by_token(data.pop("e"), int(data.pop("tk")))
+        if("ts" in data):               # Symbol
+            data.pop("ts")
+        if("lp" in data):               # Last Traded Price
+            data["ltp"] = float(data.pop("lp"))
+        if("pc" in data):               # percentage change
+            data["percent_change"] = float(data.pop("pc"))
+        if("cv" in data):               # change value (absolute change in price)
+            data["change_value"] = float(data.pop("cv"))
+        if("v" in data):               # Volume
+            data["volume"] = int(data.pop("v"))
+        if("o" in data):               # Open
+            data["open"] = float(data.pop("o"))
+        if("h" in data):               # High
+            data["high"] = float(data.pop("h"))
+        if("l" in data):               # Low
+            data["low"] = float(data.pop("l"))
+        if("c" in data):               # Close
+            data["close"] = float(data.pop("c"))
+        if("ft" in data):               # Feed Time
+            data["exchange_time_stamp"] = datetime.datetime.fromtimestamp(int(data.pop("ft")))
+        if("ap" in data):               # Average Price
+            data["atp"] = float(data.pop("ap"))
+        if("ti" in data):               # Tick Increment
+            data["tick_increment"] = float(data.pop("ti"))
+        if("ls" in data):               # Lot Size
+            data["lot_size"] = int(data.pop("ls"))
+        if(data["instrument"].symbol not in self.__depth_data):                # Initialize depth data
+            self.__depth_data[data["instrument"].symbol] = {}
+            self.__depth_data[data["instrument"].symbol]["bid_prices"]     = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["ask_prices"]     = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"] = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"] = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["buy_orders"]     = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["sell_orders"]    = [None, None, None, None, None]
+        if("bp1" in data):               # Best Bid
+            data["best_bid_price"] = float(data.pop("bp1"))
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][0] = data["best_bid_price"]
+        if("sp1" in data):               # Best Ask
+            data["best_ask_price"] = float(data.pop("sp1"))
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][0] = data["best_ask_price"]
+        if("bq1" in data):               # Best Bid Quantity
+            data["best_bid_quantity"] = int(data.pop("bq1"))
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][0] = data["best_bid_quantity"]
+        if("sq1" in data):               # Best Ask Quantity
+            data["best_ask_quantity"] = int(data.pop("sq1"))
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][0] = data["best_ask_quantity"]
+        if("pp" in data):                # Price Precision
+            data["price_precision"] = int(data.pop("pp"))
+        if("toi" in data):               # Total Open Interest
+            data["total_open_interest"] = int(data.pop("toi"))
+        return data
     
-    def __conver_exchanges(self, dictionary):
-        if('exchange' in dictionary):
-            d = self.__exchange_codes
-            dictionary['exchange'] = list(d.keys())[list(d.values()).index(dictionary['exchange'])]
-        return dictionary
+    def __extract_depth_data(self, data):
+        """ example depth frame 
+        message - {"t":"dk","pp":"2","ml":"1","e":"NSE","tk":"1594","ts":"INFY-EQ","ls":"1","ti":"0.05","c":"1461.75","lp":"1489.90","pc":"1.93","o":"1473.10","h":"1496.10","l":"1466.00","uc":"1607.90","lc":"1315.60","toi":"53068800","ft":"1661853600","ltq":"10","ltt":"15:29:59","v":"6724948","tbq":"308293","tsq":"177491","bp1":"1489.55","sp1":"1489.90","bp2":"1489.45","sp2":"1489.95","bp3":"1489.40","sp3":"1490.00","bp4":"1489.10","sp4":"1490.80","bp5":"1489.00","sp5":"1491.00","bq1":"1","sq1":"25","bq2":"5","sq2":"1358","bq3":"468","sq3":"2221","bq4":"500","sq4":"600","bq5":"30","sq5":"258","bo1":"1","so1":"1","bo2":"1","so2":"2","bo3":"2","so3":"5","bo4":"1","so4":"1","bo5":"3","so5":"6","ap":"1485.71"}"""
+        # Extract tick data first
+        data = self.__extract_tick_data(data)
 
-    def __convert_instrument(self, dictionary):
-        if('exchange' in dictionary) and ('token' in dictionary):
-            dictionary['instrument'] = self.get_instrument_by_token(dictionary['exchange'], dictionary['token'])
-        return dictionary
-        
-    def __modify_human_readable_values(self, dictionary):
-        dictionary = self.__convert_prices(dictionary, self.__exchange_price_multipliers[dictionary['exchange']])
-        dictionary = self.__conver_exchanges(dictionary)
-        dictionary = self.__convert_instrument(dictionary)
-        return dictionary
+        # Bid Prices
+        if("bp2" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][1] = float(data.pop("bp2"))
+        if("bp3" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][2] = float(data.pop("bp3"))
+        if("bp4" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][3] = float(data.pop("bp4"))
+        if("bp5" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][4] = float(data.pop("bp5"))
+
+        # Ask Prices
+        if("sp2" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][1] = float(data.pop("sp2"))
+        if("sp3" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][2] = float(data.pop("sp3"))
+        if("sp4" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][3] = float(data.pop("sp4"))
+        if("sp5" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][4] = float(data.pop("sp5"))
+
+        # Bid Quantities
+        if("bq2" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][1] = int(data.pop("bq2"))
+        if("bq3" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][2] = int(data.pop("bq3"))
+        if("bq4" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][3] = int(data.pop("bq4"))
+        if("bq5" in data):
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][4] = int(data.pop("bq5"))
+
+        # Ask Quantities
+        if("sq2" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][1] = int(data.pop("sq2"))
+        if("sq3" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][2] = int(data.pop("sq3"))
+        if("sq4" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][3] = int(data.pop("sq4"))
+        if("sq5" in data):
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][4] = int(data.pop("sq5"))
+
+        # Buy Orders
+        if("bo1" in data):
+            self.__depth_data[data["instrument"].symbol]["buy_orders"][1] = int(data.pop("bo1"))
+        if("bo2" in data):
+            self.__depth_data[data["instrument"].symbol]["buy_orders"][1] = int(data.pop("bo2"))
+        if("bo3" in data):
+            self.__depth_data[data["instrument"].symbol]["buy_orders"][2] = int(data.pop("bo3"))
+        if("bo4" in data):
+            self.__depth_data[data["instrument"].symbol]["buy_orders"][3] = int(data.pop("bo4"))
+        if("bo5" in data):
+            self.__depth_data[data["instrument"].symbol]["buy_orders"][4] = int(data.pop("bo5"))
+
+        # Sell Orders
+        if("so1" in data):
+            self.__depth_data[data["instrument"].symbol]["sell_orders"][1] = int(data.pop("so1"))
+        if("so2" in data):
+            self.__depth_data[data["instrument"].symbol]["sell_orders"][1] = int(data.pop("so2"))
+        if("so3" in data):
+            self.__depth_data[data["instrument"].symbol]["sell_orders"][2] = int(data.pop("so3"))
+        if("so4" in data):
+            self.__depth_data[data["instrument"].symbol]["sell_orders"][3] = int(data.pop("so4"))
+        if("so5" in data):
+            self.__depth_data[data["instrument"].symbol]["sell_orders"][4] = int(data.pop("so5"))
+
+        # Update depth data in dict
+        data["bid_prices"] = self.__depth_data[data["instrument"].symbol]["bid_prices"].copy()
+        data["ask_prices"] = self.__depth_data[data["instrument"].symbol]["ask_prices"].copy()
+        data["bid_quantities"] = self.__depth_data[data["instrument"].symbol]["bid_quantities"].copy()
+        data["ask_quantities"] = self.__depth_data[data["instrument"].symbol]["ask_quantities"].copy()
+        data["buy_orders"] = self.__depth_data[data["instrument"].symbol]["buy_orders"].copy()
+        data["sell_orders"] = self.__depth_data[data["instrument"].symbol]["sell_orders"].copy()
+
+        if("oi" in data):               # Open Interest
+            data["open_interest"] = int(data.pop("oi"))
+        if("ltq" in data):               # Last Traded Quantity
+            data["last_traded_quantity"] = int(data.pop("ltq"))
+        if("ltt" in data):               # Last Traded Time
+            data["last_traded_time"] = datetime.datetime.strptime(data.pop("ltt"), "%H:%M:%S").time()
+        if("tbq" in data):               # Total Buy Quantity
+            data["total_buy_quantity"] = int(data.pop("tbq"))
+        if("tsq" in data):               # Total Sell Quantity
+            data["total_sell_quantity"] = int(data.pop("tsq"))
+        if("uc" in data):               # Upper Circuit
+            data["upper_circuit"] = float(data.pop("uc"))
+        if("lc" in data):               # Lower Circuit
+            data["lower_circuit"] = float(data.pop("lc"))
+        return data
 
     def __on_data_callback(self, ws=None, message=None, data_type=None, continue_flag=None):
+        # Sample messages 
+        # message = '{"t":"tk","pp":"2","ml":"1","e":"NSE","tk":"1594","ts":"INFY-EQ","ls":"1","ti":"0.05","c":"1492.95","lp":"1464.55","pc":"-1.90","o":"1460.05","h":"1468.10","l":"1451.05","toi":"59451300","ft":"1662025323","v":"7397051","bp1":"1464.50","sp1":"1464.90","bq1":"22","sq1":"285","ap":"1460.13"}'
+        # message = '{"t":"dk","pp":"2","ml":"1","e":"NSE","tk":"1594","ts":"INFY-EQ","ls":"1","ti":"0.05","c":"1492.95","lp":"1464.55","pc":"-1.90","o":"1460.05","h":"1468.10","l":"1451.05","uc":"1642.20","lc":"1343.70","toi":"59451300","ft":"1662025323","ltq":"47","ltt":"15:12:02","v":"7397051","tbq":"512544","tsq":"2368667","bp1":"1464.50","sp1":"1464.90","bp2":"1464.35","sp2":"1464.95","bp3":"1464.25","sp3":"1465.00","bp4":"1464.20","sp4":"1465.05","bp5":"1464.15","sp5":"1465.10","bq1":"22","sq1":"285","bq2":"88","sq2":"299","bq3":"460","sq3":"4173","bq4":"50","sq4":"300","bq5":"317","sq5":"242","bo1":"1","so1":"4","bo2":"1","so2":"6","bo3":"1","so3":"43","bo4":"1","so4":"1","bo5":"2","so5":"2","ap":"1460.13"}'
+        # message = '{"t":"tf","e":"NSE","tk":"1594","ft":"1662025326","v":"7399482","bp1":"1464.25","sp1":"1464.35","bq1":"460","sq1":"11"}'
+        # message = '{"t":"df","e":"NSE","tk":"1594","ft":"1662025327","v":"7400196","ltt":"15:12:07","tbq":"510593","tsq":"2364472","bp1":"1464.55","sp1":"1464.90","bp2":"1464.30","sp2":"1464.95","bp3":"1464.25","sp3":"1465.00","bp4":"1464.20","sp4":"1465.05","bp5":"1464.15","sp5":"1465.10","bq1":"1","sq1":"301","bq2":"598","sq2":"61","bq3":"83","sq3":"3573","bq4":"175","sq4":"300","bq5":"482","sq5":"51","bo2":"5","so2":"4","bo3":"2","so3":"42","bo4":"3","so4":"1","bo5":"5","so5":"2"}'
+        # message = '{"t":"df","e":"NSE","tk":"1594","ft":"1662025324","v":"7397757","ltq":"2","ltt":"15:12:04","tbq":"513958","tsq":"2373240","sp1":"1464.95","sp2":"1465.00","sp3":"1465.05","sp4":"1465.10","sp5":"1465.15","bq1":"275","sq1":"37","sq2":"3472","sq3":"300","sq4":"26","sq5":"110","bo1":"5","so1":"8","so2":"40","so3":"1","so4":"2","so5":"4"}'
+        #logging.info(f"message - {message}")
         if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
             message = ws
-        if(message[0] == WsFrameMode.MARKETDATA):
-            p = MarketData.parse(message[1:])
-            res = self.__modify_human_readable_values(p) 
+        data = json.loads(message)
+        if(data["t"] == "ck"):           # Connection acknowledgment
+            pass                            # Ignore Connection acknowledgment, nothing to extract from it
+        elif(data["t"] == "tk"):         # tick data acknowledgment
             if(self.__subscribe_callback is not None):
-                self.__subscribe_callback(res)
-        elif(message[0] == WsFrameMode.COMPACT_MARKETDATA):
-            p = CompactData.parse(message[1:])
-            res = self.__modify_human_readable_values(p) 
+                data.pop("t")
+                data = self.__extract_tick_data(data)
+                logging.info(f"Tick Data Acknowledgement {data}") # @TODO remove 
+                self.__subscribe_callback(data)
+        elif(data["t"] == "dk"):         # depth data acknowledgment
             if(self.__subscribe_callback is not None):
-                self.__subscribe_callback(res)
-        elif(message[0] == WsFrameMode.SNAPQUOTE):
-            p = SnapQuote.parse(message[1:])
-            res = self.__modify_human_readable_values(p) 
+                data.pop("t")
+                data = self.__extract_depth_data(data)
+                logging.info(f"Depth Data Acknowledgement {data}") # @TODO remove 
+                self.__subscribe_callback(data)
+        elif(data["t"] == "tf"):         # tick data feed
             if(self.__subscribe_callback is not None):
-                self.__subscribe_callback(res)
-        elif(message[0] == WsFrameMode.FULL_SNAPQUOTE):
-            p = FullSnapQuote.parse(message[1:])
-            res = self.__modify_human_readable_values(p)
+                data.pop("t")
+                data = self.__extract_tick_data(data)
+                logging.info(f"Tick feed {data}") # @TODO remove 
+                self.__subscribe_callback(data)
+        elif(data["t"] == "df"):         # depth data feed
             if(self.__subscribe_callback is not None):
-                self.__subscribe_callback(res)
-        elif(message[0] == WsFrameMode.DPR):
-            p = DPR.parse(message[1:])
-            res = self.__modify_human_readable_values(p) 
-            if(self.__dpr_callback is not None):
-                self.__dpr_callback(res)
-        elif(message[0] == WsFrameMode.OI):
-            p = OpenInterest.parse(message[1:])
-            res = self.__modify_human_readable_values(p) 
-            if(self.__oi_callback is not None):
-                self.__oi_callback(res)
-        elif(message[0] == WsFrameMode.MARKET_STATUS):
-            p = MarketStatus.parse(message[1:])
-            res = self.__modify_human_readable_values(p)
-            self.__market_status_messages.append(res) 
-            if(self.__market_status_messages_callback is not None):
-                self.__market_status_messages_callback(res)
-        elif(message[0] == WsFrameMode.EXCHANGE_MESSAGES):
-            p = ExchangeMessage.parse(message[1:])
-            res = self.__modify_human_readable_values(p)
-            self.__exchange_messages.append(res) 
-            if(self.__exchange_messages_callback is not None):
-                self.__exchange_messages_callback(res)
+                data.pop("t")
+                data = self.__extract_depth_data(data)
+                logging.info(f"depth feed {data}") # @TODO remove 
+                self.__subscribe_callback(data)
          
     def __on_close_callback(self, *arguments, **keywords):
         self.__websocket_connected = False
@@ -426,32 +447,25 @@ class AliceBlue:
         if self.__on_error:
             self.__on_error(error)
 
-    def __send_heartbeat(self):
-        heart_beat = {"a": "h", "v": [], "m": ""}
-        while True:
-            sleep(5)
-            self.__ws_send(json.dumps(heart_beat), opcode = websocket._abnf.ABNF.OPCODE_PING)
-
     def __ws_run_forever(self):
         while True:
             try:
-                self.__websocket.run_forever()
+                self.__websocket.run_forever(ping_interval=3, ping_payload='{"t":"h"}')
             except Exception as e:
                 logger.warning(f"websocket run forever ended in exception, {e}")
             sleep(0.1) # Sleep for 100ms between reconnection.
 
-    def __ws_send(self, *args, **kwargs):
+    def __ws_send(self, data):
         while self.__websocket_connected == False:
             sleep(0.05)  # sleep for 50ms if websocket is not connected, wait for reconnection
         with self.__ws_mutex:
-            self.__websocket.send(*args, **kwargs)
+            self.__websocket.send(json.dumps(data))
 
     def start_websocket(self, subscribe_callback = None, 
                                 order_update_callback = None,
                                 socket_open_callback = None,
                                 socket_close_callback = None,
                                 socket_error_callback = None,
-                                run_in_background=False,
                                 market_status_messages_callback = None,
                                 exchange_messages_callback = None,
                                 oi_callback = None,
@@ -467,60 +481,79 @@ class AliceBlue:
         self.__oi_callback = oi_callback
         self.__dpr_callback = dpr_callback
         
-        url = self.__service_config['socket_endpoint'].format(access_token=self.__access_token)
-        self.__websocket = websocket.WebSocketApp(url,
-                                                on_data=self.__on_data_callback,
-                                                on_error=self.__on_error_callback,
-                                                on_close=self.__on_close_callback,
-                                                on_open=self.__on_open_callback)
-        th = threading.Thread(target=self.__send_heartbeat)
-        th.daemon = True
-        th.start()
-        if run_in_background is True:
-            self.__ws_thread = threading.Thread(target=self.__ws_run_forever)
-            self.__ws_thread.daemon = True
-            self.__ws_thread.start()
-        else:
-            self.__ws_run_forever()
+        # Create websocket session
+        data = {"loginType" : "API"}
+        r = self.__api_call_helper('createWsSession', Requests.POST, data)
+        # ws_session_id = r["result"]["wsSess"]
+        # logging.info(f"ws session id {ws_session_id}")
+
+        # Create websocket connection
+        self.__websocket_connected = False
+        self.__websocket = websocket.WebSocketApp(self.__urls['ws'],
+                                                    on_data=self.__on_data_callback,
+                                                    on_error=self.__on_error_callback,
+                                                    on_close=self.__on_close_callback,
+                                                    on_open=self.__on_open_callback)
+        self.__ws_thread = threading.Thread(target=self.__ws_run_forever)
+        self.__ws_thread.daemon = True
+        self.__ws_thread.start()
+
+        # Send initial data 
+        data = {"susertoken": hashlib.sha256(hashlib.sha256(self.__session_id.encode('utf-8')).hexdigest().encode('utf-8')).hexdigest(),
+                "t": "c",
+                "actid": self.__username + "_API",
+                "uid": self.__username + "_API",
+                "source": "API"
+                }
+        self.__ws_send(data)
 
     def get_profile(self):
         """ Get profile """
-        profile = self.__api_call_helper('profile', Requests.GET, None, None)
-        if(profile['status'] != 'error'):
-            self.__enabled_exchanges = profile['data']['exchanges']
+        exch_dt = {"nse_cm"    : "NSE",
+                    "bse_cm"    : "BSE",
+                    "nse_fo"    : "NFO",
+                    "mcx_fo"    : "MCX",
+                    "cde_fo"    : "CDS",
+                    "mcx_sx"    : "BFO",
+                    "bcs_fo"    : "BCD",
+                    "nse_com"   : "NCO",
+                    "bse_com"   : "BCO"}
+        profile = self.__api_call_helper('profile', Requests.GET)
+        x = profile['exchEnabled'].split("|")
+        self.__enabled_exchanges = [exch_dt[i] for i in x]
         return profile
 
     def get_balance(self):
         """ Get balance/margins """
-        return self.__api_call_helper('balance', Requests.GET, None, None)
+        return self.__api_call_helper('getRmsLimits', Requests.GET)
 
     def get_daywise_positions(self):
         """ Get daywise positions """
-        return self.__api_call_helper('positions_daywise', Requests.GET, None, None)
+        return self.__api_call_helper('positions', Requests.POST, {"ret" : "DAY"})
 
     def get_netwise_positions(self):
         """ Get netwise positions """
-        return self.__api_call_helper('positions_netwise', Requests.GET, None, None)
+        return self.__api_call_helper('positions', Requests.POST, {"ret" : "NET"})
 
     def get_holding_positions(self):
-        """ Get holding positions """
-        return self.__api_call_helper('positions_holdings', Requests.GET, None, None)
+        """ Get holdings positions """
+        return self.__api_call_helper('holdings', Requests.GET)
 
     def get_order_history(self, order_id=None):
-        """ leave order_id as None to get all entire order history """
-        if order_id is None:
-            return self.__api_call_helper('get_orders', Requests.GET, None, None)
+        """ Get order history """
+        if(order_id == None):
+            return self.__api_call_helper('fetchOrder', Requests.GET)
         else:
-            return self.__api_call_helper('get_order_info', Requests.GET, {'order_id': order_id}, None)
+            return self.__api_call_helper('orderHistory', Requests.POST, {'nestOrderNumber': order_id})
     
     def get_scrip_info(self, instrument):
         """ Get scrip information """
-        params = {'exchange': instrument.exchange, 'token': instrument.token}
-        return self.__api_call_helper('scripinfo', Requests.GET, params, None)
+        data = {'exch': instrument.exchange, 'symbol': instrument.token}
+        return self.__api_call_helper('scripDetails', Requests.POST, data)
 
     def get_trade_book(self):
         """ get all trades """
-        return self.__api_call_helper('trade_book', Requests.GET, None, None)
+        return self.__api_call_helper('fetchTrade', Requests.GET)
 
     def get_exchanges(self):
         """ Get enabled exchanges """
@@ -535,18 +568,21 @@ class AliceBlue:
                 prod_type = 'NRML'
             else:
                 prod_type = 'CNC'
-        elif(product_type == ProductType.CoverOrder):
-            prod_type = 'CO'
-        elif(product_type == ProductType.BracketOrder):
-            prod_type = None
         return prod_type
+
+    def __get_complexity_str(self, order_type):
+        complexity = "Regular"
+        if(order_type == OrderType.BracketOrder):
+            complexity = 'BO'
+        elif(order_type == OrderType.AfterMarketOrder):
+            complexity = 'AMO'
+        return complexity
 
     def place_order(self, transaction_type, instrument, quantity, order_type,
                     product_type, price=0.0, trigger_price=None,
-                    stop_loss=None, square_off=None, trailing_sl=None,
-                    is_amo = False,
-                    order_tag = 'order1',
-                    is_ioc = False):
+                    stop_loss=None, target=None, trailing_sl=None,
+                    disclosed_quantity = None,
+                    order_tag = None):
         """ placing an order, many fields are optional and are not required
             for all order types
         """
@@ -572,123 +608,40 @@ class AliceBlue:
             raise TypeError("Optional parameter trigger_price not of type float")
 
         prod_type = self.__get_product_type_str(product_type, instrument.exchange)
+        complexity = self.__get_complexity_str(order_type)
         # construct order object after all required parameters are met
-        order = {  'exchange': instrument.exchange,
-                   'order_type': order_type.value,
-                   'instrument_token': instrument.token,
-                   'quantity':quantity,
-                   'disclosed_quantity':0,
-                   'price':price,
-                   'transaction_type':transaction_type.value,
-                   'trigger_price':trigger_price,
-                   'validity':'DAY' if is_ioc == False else 'IOC',
-                   'product':prod_type,
-                   'source':'web',
-                   'order_tag': order_tag}
+        self.__order_tag += 1
+        order = [{  "discqty"        : quantity if disclosed_quantity == None else disclosed_quantity,
+                    "exch"           : instrument.exchange,
+                    "transtype"      : transaction_type.value, 
+                    "ret"            : "DAY",
+                    "prctyp"         : order_type.value,
+                    "qty"            : quantity,
+                    "symbol_id"      : instrument.token,
+                    "trading_symbol" : instrument.symbol,
+                    "price"          : price,
+                    "trigPrice"      : trigger_price,
+                    "pCode"          : prod_type,
+                    "complexty"      : complexity,
+                    "orderTag"       : self.__order_tag if(order_tag == None) else order_tag
+                }]
 
-        if stop_loss is not None and not isinstance(stop_loss, float):
-            raise TypeError("Optional parameter stop_loss not of type float")
-        elif stop_loss is not None:
-            order['stop_loss_value'] = stop_loss
-
-        if square_off is not None and not isinstance(square_off, float):
-            raise TypeError("Optional parameter square_off not of type float")
-        elif square_off is not None:
-            order['square_off_value'] = square_off
-
-        if trailing_sl is not None and not isinstance(trailing_sl, int):
-            raise TypeError("Optional parameter trailing_sl not of type int")
-        elif trailing_sl is not None:
-            order['trailing_stop_loss'] = trailing_sl
-
-        if product_type is ProductType.CoverOrder:
-            if not isinstance(trigger_price, float):
-                raise TypeError("Required parameter trigger_price not of type float")
-
-        if(is_amo == True):
-            helper = 'place_amo'
-        else:
-            helper = 'place_order'
-
-        if product_type is ProductType.BracketOrder:
-            helper = 'place_bracket_order'
-            del order['product'] 
+        if order_type is OrderType.BracketOrder:
             if not isinstance(stop_loss, float):
-                raise TypeError("Required parameter stop_loss not of type float")
+                raise TypeError("Required parameter stop_loss is not of type float")
 
-            if not isinstance(square_off, float):
-                raise TypeError("Required parameter square_off not of type float")
+            if not isinstance(target, float):
+                raise TypeError("Required parameter target is not of type float")
             
-        return self.__api_call_helper(helper, Requests.POST, None, order)
+            order["stopLoss"] = stop_loss
+            order["target"] = target
 
-    def place_basket_order(self, orders):
-        """ placing a basket order, 
-            Argument orders should be a list of all orders that should be sent
-            each element in order should be a dictionary containing the following key.
-            "instrument", "order_type", "quantity", "price" (only if its a limit order), 
-            "transaction_type", "product_type"
-        """
-        keys = {"instrument"        : Instrument, 
-                "order_type"        : OrderType, 
-                "quantity"          : int,
-                "transaction_type"  : TransactionType,
-                "product_type"      : ProductType}
-        if not isinstance(orders, list):
-            raise TypeError("Required parameter orders is not of type list")
+            if trailing_sl is not None and not isinstance(trailing_sl, int):
+                raise TypeError("Optional parameter trailing_sl not of type int")
+            elif trailing_sl is not None:
+                order["trailing_stop_loss"] = trailing_sl
 
-        if len(orders) <= 0:
-            raise TypeError("Length of orders should be greater than 0")
-
-        for i in orders:
-            if not isinstance(i, dict):
-                raise TypeError("Each element in orders should be of type dict")
-            for s in keys:
-                if s not in i:
-                    raise TypeError(f"Each element in orders should have key {s}")
-                if type(i[s]) is not keys[s]:  
-                    raise TypeError(f"Element '{s}' in orders should be of type {keys[s]}")
-            if i['order_type'] == OrderType.Limit or i['order_type'] == OrderType.StopLossLimit:
-                if "price" not in i:
-                    raise TypeError("Each element in orders should have key 'price' if its a limit order ")
-                if not isinstance(i['price'], float):
-                    raise TypeError("Element price in orders should be of type float")
-            else:
-                i['price'] = 0.0
-            if i['order_type'] == OrderType.StopLossLimit or i['order_type'] == OrderType.StopLossMarket:
-                if 'trigger_price' not in i:
-                    raise TypeError(f"Each element in orders should have key 'trigger_price' if it is an {i['order_type']} order")
-                if not isinstance(i['trigger_price'], float):
-                    raise TypeError("Element trigger_price in orders should be of type float")
-            else:
-                i['trigger_price'] = 0.0
-                
-            if(i['product_type'] == ProductType.CoverOrder):
-                raise TypeError("Product Type CO is not supported in basket order")
-            elif(i['product_type'] == ProductType.BracketOrder):
-                raise TypeError("Product Type BO is not supported in basket order")
-            else:
-                i['product_type'] = self.__get_product_type_str(i['product_type'], i['instrument'].exchange)
-                
-            if i['quantity'] <= 0:
-                raise TypeError("Quantity should be greater than 0")
-
-        data = {'source':'web',
-                'orders' : []}
-        for i in orders:
-            # construct order object after all required parameters are met
-            data['orders'].append({'exchange'           : i['instrument'].exchange,
-                                   'order_type'         : i['order_type'].value,
-                                   'instrument_token'   : i['instrument'].token,
-                                   'quantity'           : i['quantity'],
-                                   'disclosed_quantity' : 0,
-                                   'price'              : i['price'],
-                                   'transaction_type'   : i['transaction_type'].value,
-                                   'trigger_price'      : i['trigger_price'],
-                                   'validity'           : 'DAY',
-                                   'product'            : i['product_type']})
-
-        helper = 'place_basket_order'
-        return self.__api_call_helper(helper, Requests.POST, None, data)
+        return self.__api_call_helper("placeOrder", Requests.POST, order)
 
     def modify_order(self, transaction_type, instrument, product_type, order_id, order_type, quantity, price=0.0,
                      trigger_price=0.0):
@@ -707,7 +660,7 @@ class AliceBlue:
         if type(order_type) is not OrderType:
             raise TypeError("Optional parameter order_type not of type OrderType")
 
-        if ProductType is None:
+        if product_type is None:
             raise TypeError("Required parameter product_type not of type ProductType")
 
         if price is not None and not isinstance(price, float):
@@ -716,121 +669,109 @@ class AliceBlue:
         if trigger_price is not None and not isinstance(trigger_price, float):
             raise TypeError("Optional parameter trigger_price not of type float")
 
-        product_type = self.__get_product_type_str(product_type, instrument.exchange)
+        prod_type = self.__get_product_type_str(product_type, instrument.exchange)
         # construct order object with order id
-        order = {  'oms_order_id': str(order_id),  
-                   'instrument_token': int(instrument.token),
-                   'exchange': instrument.exchange,
-                   'transaction_type':transaction_type.value,
-                   'product':product_type,
-                   'validity':'DAY',
-                   'order_type': order_type.value,
-                   'price':price,
-                   'trigger_price':trigger_price,
-                   'quantity':quantity,
-                   'disclosed_quantity':0,
-                   'nest_request_id' : '1'}
-        return self.__api_call_helper('modify_order', Requests.PUT, None, order)
+        order = {   "exch"           : instrument.exchange,
+                    "nestOrderNumber": order_id,
+                    "transtype"      : transaction_type.value, 
+                    "prctyp"         : order_type.value,
+                    "qty"            : quantity,
+                    "trading_symbol" : instrument.symbol,
+                    "price"          : price,
+                    "trigPrice"      : trigger_price,
+                    "pCode"          : prod_type
+                }
+        return self.__api_call_helper('modifyOrder', Requests.POST, order)
 
-    def cancel_order(self, order_id, leg_order_id=None, is_co=False):
+    def cancel_order(self, order_id, leg_order_id=None):
         """ Cancel single order """
-        if(is_co == False):
-            if(leg_order_id == None):
-                ret = self.__api_call_helper('cancel_order', Requests.DELETE, {'order_id': order_id}, None)
-            else:
-                ret = self.__api_call_helper('cancel_bo_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
+        if(leg_order_id == None):
+            return self.__api_call_helper('cancelOrder', Requests.POST, {'nestOrderNumber': order_id})
         else:
-            ret = self.__api_call_helper('cancel_co_order', Requests.DELETE, {'order_id': order_id, 'leg_order_id': leg_order_id}, None)
-        return ret
+            return self.__api_call_helper('exitBracketOrder', Requests.POST, {"nestOrderNumber" : order_id, "symbolOrderId" : leg_order_id, "status" : "open"})
 
-    def cancel_all_orders(self):
-        """ Cancel all orders """
-        ret = []
-        orders = self.get_order_history()['data']
-        if not orders:
-            return
-        for c_order in orders['pending_orders']:
-            if(c_order['product'] == 'BO' and c_order['leg_order_indicator']):
-                r = self.cancel_order(c_order['leg_order_indicator'], leg_order_id = c_order['leg_order_indicator'])
-            elif(c_order['product'] == 'CO'):
-                r = self.cancel_order(c_order['oms_order_id'], leg_order_id = c_order['leg_order_indicator'], is_co = True)
-            else:
-                r = self.cancel_order(c_order['oms_order_id'])
-            ret.append(r)
-        return ret
+    def square_off(self, instrument, quantity, product_type):
+        """ Square Off positions """
+        if not isinstance(instrument, Instrument):
+            raise TypeError("Required parameter instrument not of type Instrument")
 
+        if not isinstance(quantity, int):
+            raise TypeError("Required parameter quantity not of type int")
+
+        if product_type is None:
+            raise TypeError("Required parameter product_type not of type ProductType")
+
+        prod_type = self.__get_product_type_str(product_type, instrument.exchange)
+        order = {   "exchSeg"   :   instrument.exchange,
+                    "pCode"     :   prod_type,
+                    "netQty"    :   quantity,
+                    "tockenNo"  :   instrument.token,
+                    "symbol"    :   instrument.symbol
+                }
+        return self.__api_call_helper('sqrOfPosition', Requests.POST, order)
+        
     def subscribe_market_status_messages(self):
-        """ Subscribe to market messages """
-        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "market_status"}))
+        """ Subscribe to market messages @TODO need to update after alice implements market status messages """
+        pass
 
     def get_market_status_messages(self):
         """ Get market messages """
         return self.__market_status_messages
     
     def subscribe_exchange_messages(self):
-        """ Subscribe to exchange messages """
-        self.__ws_send(json.dumps({"a": "subscribe", "v": [1,2,3,4,6], "m": "exchange_messages"}))
+        """ Subscribe to exchange messages @TODO need to update after alice implements exchange messages """
+        pass
 
     def get_exchange_messages(self):
         """ Get stored exchange messages """
         return self.__exchange_messages
     
     def subscribe(self, instrument, live_feed_type):
-        """ subscribe to the current feed of an instrument """
+        """ subscribe to the current feed of an instrument or multiple instruments """
         if(type(live_feed_type) is not LiveFeedType):
-            raise TypeError("Required parameter live_feed_type not of type LiveFeedType")
-        arr = []
+            raise TypeError("Required parameter live_feed_type is not of type LiveFeedType")
+        subscribe_string = ""
         if (isinstance(instrument, list)):
             for _instrument in instrument:
                 if not isinstance(_instrument, Instrument):
-                    raise TypeError("Required parameter instrument not of type Instrument")
-                exchange = self.__exchange_codes[_instrument.exchange] 
-                arr.append([exchange, int(_instrument.token)])
+                    raise TypeError("Required parameter instrument is not of type Instrument")
+                subscribe_string = f"#{_instrument.exchange}|{int(_instrument.token)}"
                 self.__subscribers[_instrument] = live_feed_type
         else:
             if not isinstance(instrument, Instrument):
-                raise TypeError("Required parameter instrument not of type Instrument")
-            exchange = self.__exchange_codes[instrument.exchange]
-            arr = [[exchange, int(instrument.token)]]
+                raise TypeError("Required parameter instrument is not of type Instrument")
+            subscribe_string = f"#{instrument.exchange}|{int(instrument.token)}"
             self.__subscribers[instrument] = live_feed_type
-        if(live_feed_type == LiveFeedType.MARKET_DATA):
-            mode = 'marketdata' 
-        elif(live_feed_type == LiveFeedType.COMPACT):
-            mode = 'compact_marketdata' 
-        elif(live_feed_type == LiveFeedType.SNAPQUOTE):
-            mode = 'snapquote' 
-        elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
-            mode = 'full_snapquote' 
-        data = json.dumps({'a' : 'subscribe', 'v' : arr, 'm' : mode})
+        if(live_feed_type == LiveFeedType.TICK_DATA):
+            tick_type = 't' 
+        elif(live_feed_type == LiveFeedType.DEPTH_DATA):
+            tick_type = 'd' 
+        subscribe_string = subscribe_string[1:] # remove the first '#' symbol
+        data = {'k' : subscribe_string, 't' : tick_type}
         self.__ws_send(data)
 
     def unsubscribe(self, instrument, live_feed_type):
-        """ unsubscribe to the current feed of an instrument """
+        """ unsubscribe to the current feed of an instrument or multiple instruments """
         if(type(live_feed_type) is not LiveFeedType):
-            raise TypeError("Required parameter live_feed_type not of type LiveFeedType")
-        arr = []
+            raise TypeError("Required parameter live_feed_type is not of type LiveFeedType")
+        subscribe_string = ""
         if (isinstance(instrument, list)):
             for _instrument in instrument:
                 if not isinstance(_instrument, Instrument):
-                    raise TypeError("Required parameter instrument not of type Instrument")
-                exchange = self.__exchange_codes[_instrument.exchange] 
-                arr.append([exchange, int(_instrument.token)])
+                    raise TypeError("Required parameter instrument is not of type Instrument")
+                subscribe_string = f"#{_instrument.exchange}|{int(_instrument.token)}"
                 if(_instrument in self.__subscribers): del self.__subscribers[_instrument]
         else:
             if not isinstance(instrument, Instrument):
-                raise TypeError("Required parameter instrument not of type Instrument")
-            exchange = self.__exchange_codes[instrument.exchange]
-            arr = [[exchange, int(instrument.token)]]
+                raise TypeError("Required parameter instrument is not of type Instrument")
+            subscribe_string = f"#{instrument.exchange}|{int(instrument.token)}"
             if(instrument in self.__subscribers): del self.__subscribers[instrument]
-        if(live_feed_type == LiveFeedType.MARKET_DATA):
-            mode = 'marketdata' 
-        elif(live_feed_type == LiveFeedType.COMPACT):
-            mode = 'compact_marketdata' 
-        elif(live_feed_type == LiveFeedType.SNAPQUOTE):
-            mode = 'snapquote' 
-        elif(live_feed_type == LiveFeedType.FULL_SNAPQUOTE):
-            mode = 'full_snapquote' 
-        data = json.dumps({'a' : 'unsubscribe', 'v' : arr, 'm' : mode})
+        if(live_feed_type == LiveFeedType.TICK_DATA):
+            tick_type = 'u' 
+        elif(live_feed_type == LiveFeedType.DEPTH_DATA):
+            tick_type = 'ud' 
+        subscribe_string = subscribe_string[1:] # remove the first '#' symbol
+        data = {'k' : subscribe_string, 't' : tick_type}
         self.__ws_send(data)
 
     def get_all_subscriptions(self):
@@ -838,27 +779,17 @@ class AliceBlue:
         return self.__subscribers
     
     def __resubscribe(self):
-        market = []
-        compact = []
-        snap = []
-        full = []
+        tick = []
+        depth = []
         for key, value in self.get_all_subscriptions().items():
-            if(value == LiveFeedType.MARKET_DATA):
-                market.append(key) 
-            elif(value == LiveFeedType.COMPACT):
-                compact.append(key) 
-            elif(value == LiveFeedType.SNAPQUOTE):
-                snap.append(key) 
-            elif(value == LiveFeedType.FULL_SNAPQUOTE):
-                full.append(key)
-        if(len(market) > 0):
-            self.subscribe(market, LiveFeedType.MARKET_DATA)
-        if(len(compact) > 0):
-            self.subscribe(compact, LiveFeedType.COMPACT)
-        if(len(snap) > 0):
-            self.subscribe(snap, LiveFeedType.SNAPQUOTE)
-        if(len(full) > 0):
-            self.subscribe(full, LiveFeedType.FULL_SNAPQUOTE)
+            if(value == LiveFeedType.TICK_DATA):
+                tick.append(key) 
+            elif(value == LiveFeedType.DEPTH_DATA):
+                depth.append(key) 
+        if(len(tick) > 0):
+            self.subscribe(tick, LiveFeedType.TICK_DATA)
+        if(len(depth) > 0):
+            self.subscribe(depth, LiveFeedType.DEPTH_DATA)
 
     def get_instrument_by_symbol(self, exchange, symbol):
         """ get instrument by providing symbol """
@@ -871,7 +802,7 @@ class AliceBlue:
             return None
         master_contract = self.__master_contracts_by_symbol[exchange]
         if symbol not in master_contract:
-            logger.warning(f"Cannot find symbol {exchange} {symbol} in master contract")
+            logger.warning(f"Cannot find symbol {symbol} in master contract {exchange}")
             return None
         return master_contract[symbol]
     
@@ -938,6 +869,23 @@ class AliceBlue:
             return None
         return master_contract[token]
 
+    def historical_data(self, instrument, ffrom, to, type):
+        """ Get Historical Data """
+        if not isinstance(instrument, Instrument):
+            raise TypeError("Required parameter instrument is not of type Instrument")
+        if not isinstance(ffrom, datetime.datetime):
+            raise TypeError("Required parameter 'ffrom' is not of type datetime")
+        if not isinstance(to, datetime.datetime):
+            raise TypeError("Required parameter 'to' is not of type datetime")
+        if not isinstance(type, HistoricalDataType):
+            raise TypeError("Required parameter 'type' is not of type HistoricalDataType")
+        data = {"token"     : instrument.token,
+                "resolution": type.value, 
+                "from"      : int(datetime.datetime.timestamp(ffrom) * 1000), 
+                "to"        : int(datetime.datetime.timestamp(to) * 1000),
+                "exchange"  : instrument.exchange}
+        return self.__api_call_helper('history', Requests.POST, data)
+
     def get_master_contract(self, exchange):
         """ Get master contract """
         return self.__master_contracts_by_symbol[exchange]
@@ -946,67 +894,79 @@ class AliceBlue:
         """ returns all the tradable contracts of an exchange
             placed in an OrderedDict and the key is the token
         """
-        logger.info(f'Downloading master contracts for exchange: {exchange}')
-        body = self.__api_call_helper('master_contract', Requests.GET, {'exchange': exchange}, None)
+        # See if master contracts are present in local.
+        present = False
+        dr = tempfile.gettempdir()
+        tmp_file = os.path.join(dr, f"alice_blue_master_contract_{exchange}.json")
+        if(os.path.isfile(tmp_file) == True):
+            with open(tmp_file, 'r') as fo:
+                d = json.loads(fo.read())
+                if(datetime.datetime.now(pytz.timezone("Asia/Kolkata")).date() == datetime.datetime.strptime(d["contract_date"], "%d-%m-%Y").date()):
+                    logger.info(f'Took master contracts from local for exchange: {exchange}')
+                    body = d
+                    present = True
+        # if not download from alice server
+        if(present == False):
+            logger.info(f'Downloading master contracts for exchange: {exchange}')
+            body = self.__api_call_helper('master_contract', Requests.GET, params={'exchange': exchange})
+            # Write to temp file
+            with open(tmp_file, 'w') as fo:
+                fo.write(json.dumps(body))
         master_contract_by_token = OrderedDict()
         master_contract_by_symbol = OrderedDict()
         for sub in body:
-            for scrip in body[sub]:
-                # convert token
-                token = int(scrip['code'])
-    
-                # convert symbol to upper
-                symbol = scrip['symbol']
-    
-                # convert expiry to none if it's non-existent
-                if('expiry' in scrip):
-                    expiry = datetime.datetime.fromtimestamp(scrip['expiry']).date()
-                else:
-                    expiry = None
-    
-                # convert lot size to int
-                if('lotSize' in scrip):
-                    lot_size = scrip['lotSize']
-                else:
-                    lot_size = None
-                    
-                # Name & Exchange 
-                name = scrip['company'] 
-                exch = scrip['exchange']
-    
-                instrument = Instrument(exch, token, symbol, name, expiry, lot_size)
-                master_contract_by_token[token] = instrument
-                master_contract_by_symbol[symbol] = instrument
+            if(sub != "contract_date"):
+                for scrip in body[sub]:
+                    # convert token
+                    token = int(scrip['token'])
+        
+                    # convert symbol to upper
+                    symbol = scrip['trading_symbol']
+        
+                    # convert expiry to none if it's non-existent
+                    if('expiry_date' in scrip):
+                        expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000).date()
+                    else:
+                        expiry = None
+        
+                    # convert lot size to int
+                    if('lot_size' in scrip):
+                        lot_size = scrip['lot_size']
+                    else:
+                        lot_size = None
+                        
+                    # Name & Exchange 
+                    name = scrip['formatted_ins_name'] 
+                    exch = scrip['exch']
+        
+                    instrument = Instrument(exch, token, symbol, name, expiry, lot_size)
+                    master_contract_by_token[token] = instrument
+                    master_contract_by_symbol[symbol] = instrument
         self.__master_contracts_by_token[exchange] = master_contract_by_token
         self.__master_contracts_by_symbol[exchange] = master_contract_by_symbol
 
-    def __api_call_helper(self, name, http_method, params, data):
+    def __api_call_helper(self, name, http_method, data=None, params=None):
         # helper formats the url and reads error codes nicely
-        config = self.__service_config
-        url = f"{config['host']}{config['routes'][name]}"
+        url = self.__urls[name]
         if params is not None:
             url = url.format(**params)
         response = self.__api_call(url, http_method, data)
         if response.status_code != 200:
             raise requests.HTTPError(response.text)
-        return json.loads(response.text)
+        return response.json()
 
     def __api_call(self, url, http_method, data):
         #logger.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
-        headers = {"Content-Type": "application/json"} 
-        if(len(self.__access_token) > 100):
-            headers['X-Authorization-Token'] = self.__access_token
-            headers['Connection'] = 'keep-alive'
-        else:
-            headers['client_id'] = self.__username
-            headers['authorization'] = f"Bearer {self.__access_token}"
+        # Update header with Session ID
+        headers = { "Content-Type"  : "application/json",
+                    "Authorization" : f"Bearer {self.__username} {self.__session_id}"}
         r = None
         if http_method is Requests.POST:
-            r = requests.post(url, data=json.dumps(data), headers=headers)
+            r = requests.post(url, json=data, headers=headers)
         elif http_method is Requests.DELETE:
             r = requests.delete(url, headers=headers)
         elif http_method is Requests.PUT:
-            r = requests.put(url, data=json.dumps(data), headers=headers)
+            r = requests.put(url, json=data, headers=headers)
         elif http_method is Requests.GET:
             r = requests.get(url, headers=headers)
         return r
