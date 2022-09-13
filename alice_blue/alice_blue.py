@@ -156,6 +156,7 @@ class AliceBlue:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
+        self.__get_master_contract("INDICES")
         if(master_contracts_to_download == None):
             for e in self.__enabled_exchanges:
                 self.__get_master_contract(e)
@@ -912,38 +913,41 @@ class AliceBlue:
             # Write to temp file
             with open(tmp_file, 'w') as fo:
                 fo.write(json.dumps(body))
-        master_contract_by_token = OrderedDict()
-        master_contract_by_symbol = OrderedDict()
-        for sub in body:
-            if(sub != "contract_date"):
-                for scrip in body[sub]:
+        for exch in body:
+            if(exch != "contract_date"):
+                for scrip in body[exch]:
                     # convert token
-                    token = int(scrip['token'])
+                    token = int(scrip["token"])
         
                     # convert symbol to upper
-                    symbol = scrip['trading_symbol']
+                    if("trading_symbol" in scrip):
+                        symbol = scrip["trading_symbol"]
+                    else:
+                        symbol = scrip["symbol"]
         
                     # convert expiry to none if it's non-existent
-                    if('expiry_date' in scrip):
+                    if("expiry_date" in scrip):
                         expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000).date()
                     else:
                         expiry = None
         
                     # convert lot size to int
-                    if('lot_size' in scrip):
-                        lot_size = scrip['lot_size']
-                    else:
-                        lot_size = None
+                    lot_size = None
+                    if("lot_size" in scrip):
+                        lot_size = scrip["lot_size"]
                         
-                    # Name & Exchange 
-                    name = scrip['formatted_ins_name'] 
-                    exch = scrip['exch']
-        
+                    # Name  
+                    name = None
+                    if("formatted_ins_name" in scrip):
+                        name = scrip["formatted_ins_name"]
+                    
                     instrument = Instrument(exch, token, symbol, name, expiry, lot_size)
-                    master_contract_by_token[token] = instrument
-                    master_contract_by_symbol[symbol] = instrument
-        self.__master_contracts_by_token[exchange] = master_contract_by_token
-        self.__master_contracts_by_symbol[exchange] = master_contract_by_symbol
+                    if(exch not in self.__master_contracts_by_token):
+                        self.__master_contracts_by_token[exch] = {}
+                    if(exch not in self.__master_contracts_by_symbol):
+                        self.__master_contracts_by_symbol[exch] = {}
+                    self.__master_contracts_by_token[exch][token] = instrument
+                    self.__master_contracts_by_symbol[exch][symbol] = instrument
 
     def __api_call_helper(self, name, http_method, data=None, params=None):
         # helper formats the url and reads error codes nicely
