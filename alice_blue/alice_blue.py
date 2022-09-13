@@ -814,7 +814,7 @@ class AliceBlue:
             return
         matches = []
         for i in res:
-            sp = i.symbol.split(' ')
+            sp = i.name.split(' ')
             if(sp[0] == symbol):
                 if(i.expiry == expiry_date):
                     matches.append(i)
@@ -823,7 +823,7 @@ class AliceBlue:
                 if('FUT' in i.symbol):
                     return i
             else:
-                sp = i.symbol.split(' ')
+                sp = i.name.split(' ')
                 if((sp[-1] == 'CE') or (sp[-1] == 'PE')):           # Only option scrips 
                     if(float(sp[-2]) == float(strike)):
                         if(is_CE == True):
