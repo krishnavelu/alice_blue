@@ -736,7 +736,7 @@ class AliceBlue:
             for _instrument in instrument:
                 if not isinstance(_instrument, Instrument):
                     raise TypeError("Required parameter instrument is not of type Instrument")
-                subscribe_string = f"#{_instrument.exchange}|{int(_instrument.token)}"
+                subscribe_string += f"#{_instrument.exchange}|{int(_instrument.token)}"
                 self.__subscribers[_instrument] = live_feed_type
         else:
             if not isinstance(instrument, Instrument):
