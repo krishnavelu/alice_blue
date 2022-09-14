@@ -927,7 +927,7 @@ class AliceBlue:
         
                     # convert expiry to none if it's non-existent
                     if("expiry_date" in scrip):
-                        expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000).date()
+                        expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000, tz=pytz.utc).date()
                     else:
                         expiry = None
         
