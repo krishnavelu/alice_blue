@@ -147,6 +147,7 @@ class AliceBlue:
         self.__exchange_messages = []
         # Initialize Depth data
         self.__depth_data = {} 
+        self.__ltp = {} 
 
         try:
             self.get_profile()
@@ -247,8 +248,11 @@ class AliceBlue:
             data["instrument"] = self.get_instrument_by_token(data.pop("e"), int(data.pop("tk")))
         if("ts" in data):               # Symbol
             data.pop("ts")
+        if(data["instrument"].symbol not in self.__ltp):
+            self.__ltp[data["instrument"].symbol] = 0
         if("lp" in data):               # Last Traded Price
-            data["ltp"] = float(data.pop("lp"))
+            self.__ltp[data["instrument"].symbol] = float(data.pop("lp"))
+        data["ltp"] = self.__ltp[data["instrument"].symbol]
         if("pc" in data):               # percentage change
             data["percent_change"] = float(data.pop("pc"))
         if("cv" in data):               # change value (absolute change in price)
