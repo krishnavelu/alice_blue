@@ -181,8 +181,8 @@ reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE')
 ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC')
 india_vix_nse_index = alice.get_instrument_by_symbol('NSE', 'India VIX')
 sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'SENSEX')
-nifty50_nse_index = alice.get_instrument_by_symbol('NSE', 'Nifty 50')
-banknifty_nse_index = alice.get_instrument_by_symbol('NSE', 'Nifty Bank')
+nifty50_nse_index = alice.get_instrument_by_symbol('NSE', 'NIFTY 50')
+banknifty_nse_index = alice.get_instrument_by_symbol('NSE', 'NIFTY Bank')
 ```
 
 #### Get a single instrument by it's token number (generally useful only for BSE Equities):
@@ -337,7 +337,7 @@ You can place following types of order through this API.
 1. [Stop Loss Limit](#stop-loss-limit-order)
 1. [Stop Loss Market](#stop-loss-market-order)
 1. [Bracket Order](#bracket-order)
-1. [AMO](#after-market-rder)
+1. [AMO](#after-market-order)
 
 #### Limit Order (Intraday Buy)
 Code

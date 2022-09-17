@@ -1,4 +1,4 @@
 requests
 pytz
 websocket_client
-
+cryptography

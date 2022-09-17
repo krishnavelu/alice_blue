@@ -1,6 +1,5 @@
-from collections import OrderedDict, namedtuple
-from Crypto import Random
-from Crypto.Cipher import AES
+from collections import namedtuple
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from time import sleep
 from urllib.parse import urlparse, parse_qs
 import base64
@@ -61,6 +60,7 @@ class CryptoJsAES:
     def __unpad(data):
         return data[:-(data[-1] if type(data[-1]) == int else ord(data[-1]))]
 
+    @staticmethod
     def __bytes_to_key(data, salt, output=48):
         assert len(salt) == 8, len(salt)
         data += salt
@@ -73,12 +73,12 @@ class CryptoJsAES:
 
     @staticmethod
     def encrypt(message, passphrase):
-        salt = Random.new().read(8)
+        salt = os.urandom(8)
         key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32+16)
         key = key_iv[:32]
         iv = key_iv[32:]
-        aes = AES.new(key, AES.MODE_CBC, iv)
-        return base64.b64encode(b"Salted__" + salt + aes.encrypt(CryptoJsAES.__pad(message)))
+        aes = Cipher(algorithms.AES(key), modes.CBC(iv))
+        return base64.b64encode(b"Salted__" + salt + aes.encryptor().update(CryptoJsAES.__pad(message)) + aes.encryptor().finalize())
 
     @staticmethod
     def decrypt(encrypted, passphrase):
@@ -88,8 +88,8 @@ class CryptoJsAES:
         key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32+16)
         key = key_iv[:32]
         iv = key_iv[32:]
-        aes = AES.new(key, AES.MODE_CBC, iv)
-        return CryptoJsAES.__unpad(aes.decrypt(encrypted[16:]))
+        aes = Cipher(algorithms.AES(key), modes.CBC(iv))
+        return CryptoJsAES.__unpad(aes.decryptor.update(encrypted[16:]) + aes.decryptor().finalize())
 
 class AliceBlue:
     """ AliceBlue Class for all operations related to AliceBlue Server"""
@@ -142,13 +142,12 @@ class AliceBlue:
         self.__order_update_callback = None
         self.__market_status_messages_callback = None
         self.__exchange_messages_callback = None
-        self.__oi_callback = None
-        self.__dpr_callback = None
         self.__subscribers = {}
         self.__market_status_messages = []
         self.__exchange_messages = []
         # Initialize Depth data
         self.__depth_data = {} 
+        self.__ltp = {} 
 
         try:
             self.get_profile()
@@ -156,6 +155,7 @@ class AliceBlue:
             raise Exception(f"Couldn't get profile info with credentials provided '{e}'")
         self.__master_contracts_by_token = {}
         self.__master_contracts_by_symbol = {}
+        self.__get_master_contract("INDICES")
         if(master_contracts_to_download == None):
             for e in self.__enabled_exchanges:
                 self.__get_master_contract(e)
@@ -248,8 +248,11 @@ class AliceBlue:
             data["instrument"] = self.get_instrument_by_token(data.pop("e"), int(data.pop("tk")))
         if("ts" in data):               # Symbol
             data.pop("ts")
+        if(data["instrument"].symbol not in self.__ltp):
+            self.__ltp[data["instrument"].symbol] = 0
         if("lp" in data):               # Last Traded Price
-            data["ltp"] = float(data.pop("lp"))
+            self.__ltp[data["instrument"].symbol] = float(data.pop("lp"))
+        data["ltp"] = self.__ltp[data["instrument"].symbol]
         if("pc" in data):               # percentage change
             data["percent_change"] = float(data.pop("pc"))
         if("cv" in data):               # change value (absolute change in price)
@@ -399,7 +402,7 @@ class AliceBlue:
         # message = '{"t":"tf","e":"NSE","tk":"1594","ft":"1662025326","v":"7399482","bp1":"1464.25","sp1":"1464.35","bq1":"460","sq1":"11"}'
         # message = '{"t":"df","e":"NSE","tk":"1594","ft":"1662025327","v":"7400196","ltt":"15:12:07","tbq":"510593","tsq":"2364472","bp1":"1464.55","sp1":"1464.90","bp2":"1464.30","sp2":"1464.95","bp3":"1464.25","sp3":"1465.00","bp4":"1464.20","sp4":"1465.05","bp5":"1464.15","sp5":"1465.10","bq1":"1","sq1":"301","bq2":"598","sq2":"61","bq3":"83","sq3":"3573","bq4":"175","sq4":"300","bq5":"482","sq5":"51","bo2":"5","so2":"4","bo3":"2","so3":"42","bo4":"3","so4":"1","bo5":"5","so5":"2"}'
         # message = '{"t":"df","e":"NSE","tk":"1594","ft":"1662025324","v":"7397757","ltq":"2","ltt":"15:12:04","tbq":"513958","tsq":"2373240","sp1":"1464.95","sp2":"1465.00","sp3":"1465.05","sp4":"1465.10","sp5":"1465.15","bq1":"275","sq1":"37","sq2":"3472","sq3":"300","sq4":"26","sq5":"110","bo1":"5","so1":"8","so2":"40","so3":"1","so4":"2","so5":"4"}'
-        #logging.info(f"message - {message}")
+        # logging.info(f"message - {message}")
         if(type(ws) is not websocket.WebSocketApp): # This workaround is to solve the websocket_client's compatiblity issue of older versions. ie.0.40.0 which is used in upstox. Now this will work in both 0.40.0 & newer version of websocket_client
             message = ws
         data = json.loads(message)
@@ -409,25 +412,21 @@ class AliceBlue:
             if(self.__subscribe_callback is not None):
                 data.pop("t")
                 data = self.__extract_tick_data(data)
-                logging.info(f"Tick Data Acknowledgement {data}") # @TODO remove 
                 self.__subscribe_callback(data)
         elif(data["t"] == "dk"):         # depth data acknowledgment
             if(self.__subscribe_callback is not None):
                 data.pop("t")
                 data = self.__extract_depth_data(data)
-                logging.info(f"Depth Data Acknowledgement {data}") # @TODO remove 
                 self.__subscribe_callback(data)
         elif(data["t"] == "tf"):         # tick data feed
             if(self.__subscribe_callback is not None):
                 data.pop("t")
                 data = self.__extract_tick_data(data)
-                logging.info(f"Tick feed {data}") # @TODO remove 
                 self.__subscribe_callback(data)
         elif(data["t"] == "df"):         # depth data feed
             if(self.__subscribe_callback is not None):
                 data.pop("t")
                 data = self.__extract_depth_data(data)
-                logging.info(f"depth feed {data}") # @TODO remove 
                 self.__subscribe_callback(data)
          
     def __on_close_callback(self, *arguments, **keywords):
@@ -483,9 +482,7 @@ class AliceBlue:
         
         # Create websocket session
         data = {"loginType" : "API"}
-        r = self.__api_call_helper('createWsSession', Requests.POST, data)
-        # ws_session_id = r["result"]["wsSess"]
-        # logging.info(f"ws session id {ws_session_id}")
+        self.__api_call_helper('createWsSession', Requests.POST, data)
 
         # Create websocket connection
         self.__websocket_connected = False
@@ -520,7 +517,7 @@ class AliceBlue:
                     "bse_com"   : "BCO"}
         profile = self.__api_call_helper('profile', Requests.GET)
         x = profile['exchEnabled'].split("|")
-        self.__enabled_exchanges = [exch_dt[i] for i in x]
+        self.__enabled_exchanges = [exch_dt[i] for i in x if i in exch_dt]
         return profile
 
     def get_balance(self):
@@ -735,7 +732,7 @@ class AliceBlue:
             for _instrument in instrument:
                 if not isinstance(_instrument, Instrument):
                     raise TypeError("Required parameter instrument is not of type Instrument")
-                subscribe_string = f"#{_instrument.exchange}|{int(_instrument.token)}"
+                subscribe_string += f"#{_instrument.exchange}|{int(_instrument.token)}"
                 self.__subscribers[_instrument] = live_feed_type
         else:
             if not isinstance(instrument, Instrument):
@@ -813,7 +810,7 @@ class AliceBlue:
             return
         matches = []
         for i in res:
-            sp = i.symbol.split(' ')
+            sp = i.name.split(' ')
             if(sp[0] == symbol):
                 if(i.expiry == expiry_date):
                     matches.append(i)
@@ -822,7 +819,7 @@ class AliceBlue:
                 if('FUT' in i.symbol):
                     return i
             else:
-                sp = i.symbol.split(' ')
+                sp = i.name.split(' ')
                 if((sp[-1] == 'CE') or (sp[-1] == 'PE')):           # Only option scrips 
                     if(float(sp[-2]) == float(strike)):
                         if(is_CE == True):
@@ -912,38 +909,41 @@ class AliceBlue:
             # Write to temp file
             with open(tmp_file, 'w') as fo:
                 fo.write(json.dumps(body))
-        master_contract_by_token = OrderedDict()
-        master_contract_by_symbol = OrderedDict()
-        for sub in body:
-            if(sub != "contract_date"):
-                for scrip in body[sub]:
+        for exch in body:
+            if(exch != "contract_date"):
+                for scrip in body[exch]:
                     # convert token
-                    token = int(scrip['token'])
+                    token = int(scrip["token"])
         
                     # convert symbol to upper
-                    symbol = scrip['trading_symbol']
+                    if("trading_symbol" in scrip):
+                        symbol = scrip["trading_symbol"]
+                    else:
+                        symbol = scrip["symbol"]
         
                     # convert expiry to none if it's non-existent
-                    if('expiry_date' in scrip):
-                        expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000).date()
+                    if("expiry_date" in scrip):
+                        expiry = datetime.datetime.fromtimestamp(scrip['expiry_date']/1000, tz=pytz.utc).date()
                     else:
                         expiry = None
         
                     # convert lot size to int
-                    if('lot_size' in scrip):
-                        lot_size = scrip['lot_size']
-                    else:
-                        lot_size = None
+                    lot_size = None
+                    if("lot_size" in scrip):
+                        lot_size = scrip["lot_size"]
                         
-                    # Name & Exchange 
-                    name = scrip['formatted_ins_name'] 
-                    exch = scrip['exch']
-        
+                    # Name  
+                    name = None
+                    if("formatted_ins_name" in scrip):
+                        name = scrip["formatted_ins_name"]
+                    
                     instrument = Instrument(exch, token, symbol, name, expiry, lot_size)
-                    master_contract_by_token[token] = instrument
-                    master_contract_by_symbol[symbol] = instrument
-        self.__master_contracts_by_token[exchange] = master_contract_by_token
-        self.__master_contracts_by_symbol[exchange] = master_contract_by_symbol
+                    if(exch not in self.__master_contracts_by_token):
+                        self.__master_contracts_by_token[exch] = {}
+                    if(exch not in self.__master_contracts_by_symbol):
+                        self.__master_contracts_by_symbol[exch] = {}
+                    self.__master_contracts_by_token[exch][token] = instrument
+                    self.__master_contracts_by_symbol[exch][symbol] = instrument
 
     def __api_call_helper(self, name, http_method, data=None, params=None):
         # helper formats the url and reads error codes nicely
@@ -956,7 +956,6 @@ class AliceBlue:
         return response.json()
 
     def __api_call(self, url, http_method, data):
-        #logger.debug('url:: %s http_method:: %s data:: %s headers:: %s', url, http_method, data, headers)
         # Update header with Session ID
         headers = { "Content-Type"  : "application/json",
                     "Authorization" : f"Bearer {self.__username} {self.__session_id}"}
