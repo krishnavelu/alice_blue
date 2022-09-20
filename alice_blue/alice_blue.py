@@ -518,12 +518,7 @@ class AliceBlue:
                     "bse_com"   : "BCO"}
         profile = self.__api_call_helper('profile', Requests.GET)
         x = profile['exchEnabled'].split("|")
-        self.__enabled_exchanges = []
-        for i in x:
-            try:
-                self.__enabled_exchanges.append(exch_dt[i])
-            except:
-                pass
+        self.__enabled_exchanges = [exch_dt[i] for i in x if i in exch_dt]
         return profile
 
     def get_balance(self):
