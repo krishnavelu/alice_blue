@@ -46,13 +46,12 @@ logging.basicConfig(level=logging.DEBUG)
 ```
 
 ### Geting API Id and API secret
-api_secret is unique for each and every account. You need to enable api trading and get api_secret from alice blue.
-1. Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue to get access to api.
-2. After you get a response from alice blue, login to [developer console](http://developers.aliceblueonline.com).
-3. Click on 'Create New App'.
-4. Enter 'App Name' as you like. Enter 'Redirect URL' and 'Post Back URL' as `https://ant.aliceblueonline.com/plugin/callback`.
-5. Click on 'Save'.
-6. Copy the 'App Code' and 'App Secret'. You will need these to generate a session ID.
+api_secret is unique for each and every account. Follow [this article](https://unofficed.com/how-to-activate-the-api-in-alice-blue-for-automated-trading/) for a step by step process.
+1. Login to [developer console](http://developers.aliceblueonline.com) .
+2. Click on 'Create New App'.
+3. Enter 'App Name' as you like. Enter 'Redirect URL' and 'Post Back URL' as `https://ant.aliceblueonline.com/plugin/callback`.
+4. Click on 'Save'.
+5. Copy the 'App Code' and 'App Secret'. You will need these to generate a session ID.
 
 ### Getting an session ID
 1. Import alice_blue
