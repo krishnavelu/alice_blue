@@ -199,6 +199,7 @@ class AliceBlue:
 
         # Web Login
         checksum = CryptoJsAES.encrypt(password.encode(), encKey.encode())
+        checksum=checksum.decode("utf-8")
         data = {"userId" : username,
                 "userData" : checksum}
         r = requests.post(AliceBlue.__urls["webLogin"], json=data)
@@ -517,7 +518,12 @@ class AliceBlue:
                     "bse_com"   : "BCO"}
         profile = self.__api_call_helper('profile', Requests.GET)
         x = profile['exchEnabled'].split("|")
-        self.__enabled_exchanges = [exch_dt[i] for i in x if i in exch_dt]
+        self.__enabled_exchanges = []
+        for i in x:
+            try:
+                self.__enabled_exchanges.append(exch_dt[i])
+            except:
+                pass
         return profile
 
     def get_balance(self):
