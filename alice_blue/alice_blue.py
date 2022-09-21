@@ -165,12 +165,12 @@ class AliceBlue:
         self.ws_thread = None
 
     @staticmethod
-    def login_and_get_sessioID(username, password, twoFA, app_id, api_secret):
+    def login_and_get_sessionID(username, password, twoFA, app_id, api_secret):
         """ Login and get Session ID """
         header = {"Content-Type" : "application/json"}
         try:
             dr = tempfile.gettempdir()
-            tmp_file = os.path.join(dr, "alice_blue_key_SP22017.json")
+            tmp_file = os.path.join(dr, f"alice_blue_key_{username}.json")
             if(os.path.isfile(tmp_file) == True):
                 d = {}
                 with open(tmp_file, 'r') as fo:
@@ -199,6 +199,7 @@ class AliceBlue:
 
         # Web Login
         checksum = CryptoJsAES.encrypt(password.encode(), encKey.encode())
+        checksum = checksum.decode("utf-8")
         data = {"userId" : username,
                 "userData" : checksum}
         r = requests.post(AliceBlue.__urls["webLogin"], json=data)

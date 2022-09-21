@@ -29,7 +29,7 @@ pip --no-cache-dir install --upgrade alice_blue
 ## Getting started with API
 
 ### Overview
-There is only one class in the whole library: `AliceBlue`. The `login_and_get_sessioID()` static method is used to retrieve session ID from alice blue server. A session ID is valid for 24 hours.
+There is only one class in the whole library: `AliceBlue`. The `login_and_get_sessionID()` static method is used to retrieve session ID from alice blue server. A session ID is valid for 24 hours.
 With session ID, you can instantiate an AliceBlue object. Ideally you only need to create a session ID once every day. Once the session ID is created new, it'll be stored in a temporary location. Next time, the same session ID will be used.
 
 ### REST Documentation
@@ -47,12 +47,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### Geting API Id and API secret
 api_secret is unique for each and every account. You need to enable api trading and get api_secret from alice blue.
-1. Please [contact](https://www.aliceblueonline.com/contact-us/) alice blue to get access to api.
-2. After you get a response from alice blue, login to [developer console](http://developers.aliceblueonline.com).
-3. Click on 'Create New App'.
-4. Enter 'App Name' as you like. Enter 'Redirect URL' and 'Post Back URL' as `https://ant.aliceblueonline.com/plugin/callback`.
-5. Click on 'Save'.
-6. Copy the 'App Code' and 'App Secret'. You will need these to generate a session ID.
+1. Login to [developer console](http://developers.aliceblueonline.com).
+1. Click on 'Create New App'.
+1. Enter 'App Name' as you like. Enter 'Redirect URL' and 'Post Back URL' as `https://ant.aliceblueonline.com/plugin/callback`.
+1. Click on 'Save'.
+1. Copy the 'App Code' and 'App Secret'. You will need these to generate a session ID.
 
 ### Getting an session ID
 1. Import alice_blue
@@ -60,9 +59,9 @@ api_secret is unique for each and every account. You need to enable api trading 
 from alice_blue import *
 ```
 
-2. Create `session_id` using `login_and_get_sessioID()` function  with your `username`, `password`, `2FA (2fa is now year of birth)`, `app_id` and `api_secret`.
+2. Create `session_id` using `login_and_get_sessionID()` function  with your `username`, `password`, `2FA (2fa is now year of birth)`, `app_id` and `api_secret`.
 ```python
-session_id = AliceBlue.login_and_get_sessioID(   username    = "username", 
+session_id = AliceBlue.login_and_get_sessionID(   username    = "username", 
                                                     password    = "password", 
                                                     twoFA       = "1993",
                                                     app_id      = "app_id",

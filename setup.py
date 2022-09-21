@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",  author = 'Krishna Velu',
     author_email = 'krishnajvelu@gmail.com',
     url = 'https://github.com/krishnavelu/alice_blue',
-    install_requires=['requests', 'websocket_client', 'bs4'],
+    install_requires=['cryptography', 'pytz', 'requests', 'websocket_client'],
     keywords = ['alice', 'alice-blue', 'python', 'sdk', 'trading', 'stock markets'],
     python_requires='>=3.6',
     classifiers=[
