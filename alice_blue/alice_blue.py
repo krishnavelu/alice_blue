@@ -250,6 +250,7 @@ class AliceBlue:
         if("ts" in data):               # Symbol
             data.pop("ts")
         if(data["instrument"].symbol not in self.__tick_data):
+            self.__tick_data[data["instrument"].symbol] = {}
             self.__tick_data[data["instrument"].symbol]["ltp"] = 0
             self.__tick_data[data["instrument"].symbol]["percent_change"] = 0
             self.__tick_data[data["instrument"].symbol]["change_value"] = 0
