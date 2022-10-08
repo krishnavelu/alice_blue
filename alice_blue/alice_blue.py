@@ -717,7 +717,6 @@ class AliceBlue:
                     "transtype"      : transaction_type.value, 
                     "prctyp"         : order_type.value,
                     "qty"            : quantity,
-                    "trading_symbol" : instrument.symbol,
                     "price"          : price,
                     "trigPrice"      : trigger_price,
                     "pCode"          : prod_type
