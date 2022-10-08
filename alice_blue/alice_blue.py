@@ -147,7 +147,7 @@ class AliceBlue:
         self.__exchange_messages = []
         # Initialize Depth data
         self.__depth_data = {} 
-        self.__ltp = {} 
+        self.__tick_data = {} 
 
         try:
             self.get_profile()
@@ -249,57 +249,92 @@ class AliceBlue:
             data["instrument"] = self.get_instrument_by_token(data.pop("e"), int(data.pop("tk")))
         if("ts" in data):               # Symbol
             data.pop("ts")
-        if(data["instrument"].symbol not in self.__ltp):
-            self.__ltp[data["instrument"].symbol] = 0
+        if(data["instrument"].symbol not in self.__tick_data):
+            self.__tick_data[data["instrument"].symbol] = {}
+            self.__tick_data[data["instrument"].symbol]["ltp"] = 0
+            self.__tick_data[data["instrument"].symbol]["percent_change"] = 0
+            self.__tick_data[data["instrument"].symbol]["change_value"] = 0
+            self.__tick_data[data["instrument"].symbol]["volume"] = 0
+            self.__tick_data[data["instrument"].symbol]["open"] = 0
+            self.__tick_data[data["instrument"].symbol]["high"] = 0
+            self.__tick_data[data["instrument"].symbol]["low"] = 0
+            self.__tick_data[data["instrument"].symbol]["close"] = 0
+            self.__tick_data[data["instrument"].symbol]["exchange_time_stamp"] = None
+            self.__tick_data[data["instrument"].symbol]["atp"] = 0
+            self.__tick_data[data["instrument"].symbol]["tick_increment"] = 0
+            self.__tick_data[data["instrument"].symbol]["lot_size"] = 0
+            self.__tick_data[data["instrument"].symbol]["price_precision"] = 0
+            self.__tick_data[data["instrument"].symbol]["total_open_interest"] = 0
         if("lp" in data):               # Last Traded Price
-            self.__ltp[data["instrument"].symbol] = float(data.pop("lp"))
-        data["ltp"] = self.__ltp[data["instrument"].symbol]
+            self.__tick_data[data["instrument"].symbol]["ltp"] = float(data.pop("lp"))
         if("pc" in data):               # percentage change
-            data["percent_change"] = float(data.pop("pc"))
+            self.__tick_data[data["instrument"].symbol]["percent_change"] = float(data.pop("pc"))
         if("cv" in data):               # change value (absolute change in price)
-            data["change_value"] = float(data.pop("cv"))
-        if("v" in data):               # Volume
-            data["volume"] = int(data.pop("v"))
-        if("o" in data):               # Open
-            data["open"] = float(data.pop("o"))
-        if("h" in data):               # High
-            data["high"] = float(data.pop("h"))
-        if("l" in data):               # Low
-            data["low"] = float(data.pop("l"))
-        if("c" in data):               # Close
-            data["close"] = float(data.pop("c"))
+            self.__tick_data[data["instrument"].symbol]["change_value"] = float(data.pop("cv"))
+        if("v" in data):                # Volume
+            self.__tick_data[data["instrument"].symbol]["volume"] = int(data.pop("v"))
+        if("o" in data):                # Open
+            self.__tick_data[data["instrument"].symbol]["open"] = float(data.pop("o"))
+        if("h" in data):                # High
+            self.__tick_data[data["instrument"].symbol]["high"] = float(data.pop("h"))
+        if("l" in data):                # Low
+            self.__tick_data[data["instrument"].symbol]["low"] = float(data.pop("l"))
+        if("c" in data):                # Close
+            self.__tick_data[data["instrument"].symbol]["close"] = float(data.pop("c"))
         if("ft" in data):               # Feed Time
-            data["exchange_time_stamp"] = datetime.datetime.fromtimestamp(int(data.pop("ft")))
+            self.__tick_data[data["instrument"].symbol]["exchange_time_stamp"] = datetime.datetime.fromtimestamp(int(data.pop("ft")))
         if("ap" in data):               # Average Price
-            data["atp"] = float(data.pop("ap"))
+            self.__tick_data[data["instrument"].symbol]["atp"] = float(data.pop("ap"))
         if("ti" in data):               # Tick Increment
-            data["tick_increment"] = float(data.pop("ti"))
+            self.__tick_data[data["instrument"].symbol]["tick_increment"] = float(data.pop("ti"))
         if("ls" in data):               # Lot Size
-            data["lot_size"] = int(data.pop("ls"))
+            self.__tick_data[data["instrument"].symbol]["lot_size"] = int(data.pop("ls"))
         if(data["instrument"].symbol not in self.__depth_data):                # Initialize depth data
             self.__depth_data[data["instrument"].symbol] = {}
-            self.__depth_data[data["instrument"].symbol]["bid_prices"]     = [None, None, None, None, None]
-            self.__depth_data[data["instrument"].symbol]["ask_prices"]     = [None, None, None, None, None]
-            self.__depth_data[data["instrument"].symbol]["bid_quantities"] = [None, None, None, None, None]
-            self.__depth_data[data["instrument"].symbol]["ask_quantities"] = [None, None, None, None, None]
-            self.__depth_data[data["instrument"].symbol]["buy_orders"]     = [None, None, None, None, None]
-            self.__depth_data[data["instrument"].symbol]["sell_orders"]    = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["bid_prices"]          = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["ask_prices"]          = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"]      = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"]      = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["buy_orders"]          = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["sell_orders"]         = [None, None, None, None, None]
+            self.__depth_data[data["instrument"].symbol]["open_interest"]       = 0
+            self.__depth_data[data["instrument"].symbol]["last_traded_quantity"]= 0
+            self.__depth_data[data["instrument"].symbol]["last_traded_time"]    = None
+            self.__depth_data[data["instrument"].symbol]["total_buy_quantity"]  = 0
+            self.__depth_data[data["instrument"].symbol]["total_sell_quantity"] = 0
+            self.__depth_data[data["instrument"].symbol]["upper_circuit"]       = 0
+            self.__depth_data[data["instrument"].symbol]["lower_circuit"]       = 0
+
         if("bp1" in data):               # Best Bid
-            data["best_bid_price"] = float(data.pop("bp1"))
-            self.__depth_data[data["instrument"].symbol]["bid_prices"][0] = data["best_bid_price"]
+            self.__depth_data[data["instrument"].symbol]["bid_prices"][0] = float(data.pop("bp1"))
         if("sp1" in data):               # Best Ask
-            data["best_ask_price"] = float(data.pop("sp1"))
-            self.__depth_data[data["instrument"].symbol]["ask_prices"][0] = data["best_ask_price"]
+            self.__depth_data[data["instrument"].symbol]["ask_prices"][0] = float(data.pop("sp1"))
         if("bq1" in data):               # Best Bid Quantity
-            data["best_bid_quantity"] = int(data.pop("bq1"))
-            self.__depth_data[data["instrument"].symbol]["bid_quantities"][0] = data["best_bid_quantity"]
+            self.__depth_data[data["instrument"].symbol]["bid_quantities"][0] = int(data.pop("bq1"))
         if("sq1" in data):               # Best Ask Quantity
-            data["best_ask_quantity"] = int(data.pop("sq1"))
-            self.__depth_data[data["instrument"].symbol]["ask_quantities"][0] = data["best_ask_quantity"]
+            self.__depth_data[data["instrument"].symbol]["ask_quantities"][0] = int(data.pop("sq1"))
         if("pp" in data):                # Price Precision
-            data["price_precision"] = int(data.pop("pp"))
+            self.__tick_data[data["instrument"].symbol]["price_precision"] = int(data.pop("pp"))
         if("toi" in data):               # Total Open Interest
-            data["total_open_interest"] = int(data.pop("toi"))
+            self.__tick_data[data["instrument"].symbol]["total_open_interest"] = int(data.pop("toi"))
+        data["ltp"]                 = self.__tick_data[data["instrument"].symbol]["ltp"]
+        data["percent_change"]      = self.__tick_data[data["instrument"].symbol]["percent_change"]
+        data["change_value"]        = self.__tick_data[data["instrument"].symbol]["change_value"]
+        data["volume"]              = self.__tick_data[data["instrument"].symbol]["volume"]
+        data["open"]                = self.__tick_data[data["instrument"].symbol]["open"]
+        data["high"]                = self.__tick_data[data["instrument"].symbol]["high"]
+        data["low"]                 = self.__tick_data[data["instrument"].symbol]["low"]
+        data["close"]               = self.__tick_data[data["instrument"].symbol]["close"]
+        data["exchange_time_stamp"] = self.__tick_data[data["instrument"].symbol]["exchange_time_stamp"]
+        data["atp"]                 = self.__tick_data[data["instrument"].symbol]["atp"]
+        data["tick_increment"]      = self.__tick_data[data["instrument"].symbol]["tick_increment"]
+        data["lot_size"]            = self.__tick_data[data["instrument"].symbol]["lot_size"]
+        data["best_bid_price"]      = self.__depth_data[data["instrument"].symbol]["bid_prices"][0]
+        data["best_ask_price"]      = self.__depth_data[data["instrument"].symbol]["ask_prices"][0]
+        data["best_bid_quantity"]   = self.__depth_data[data["instrument"].symbol]["bid_quantities"][0]
+        data["best_ask_quantity"]   = self.__depth_data[data["instrument"].symbol]["ask_quantities"][0]
+        data["price_precision"]     = self.__tick_data[data["instrument"].symbol]["price_precision"]
+        data["total_open_interest"] = self.__tick_data[data["instrument"].symbol]["total_open_interest"]
         return data
     
     def __extract_depth_data(self, data):
@@ -381,19 +416,27 @@ class AliceBlue:
         data["sell_orders"] = self.__depth_data[data["instrument"].symbol]["sell_orders"].copy()
 
         if("oi" in data):               # Open Interest
-            data["open_interest"] = int(data.pop("oi"))
+            self.__depth_data[data["instrument"].symbol]["open_interest"] = int(data.pop("oi"))
         if("ltq" in data):               # Last Traded Quantity
-            data["last_traded_quantity"] = int(data.pop("ltq"))
+            self.__depth_data[data["instrument"].symbol]["last_traded_quantity"] = int(data.pop("ltq"))
         if("ltt" in data):               # Last Traded Time
-            data["last_traded_time"] = datetime.datetime.strptime(data.pop("ltt"), "%H:%M:%S").time()
+            self.__depth_data[data["instrument"].symbol]["last_traded_time"] = datetime.datetime.strptime(data.pop("ltt"), "%H:%M:%S").time()
         if("tbq" in data):               # Total Buy Quantity
-            data["total_buy_quantity"] = int(data.pop("tbq"))
+            self.__depth_data[data["instrument"].symbol]["total_buy_quantity"] = int(data.pop("tbq"))
         if("tsq" in data):               # Total Sell Quantity
-            data["total_sell_quantity"] = int(data.pop("tsq"))
+            self.__depth_data[data["instrument"].symbol]["total_sell_quantity"] = int(data.pop("tsq"))
         if("uc" in data):               # Upper Circuit
-            data["upper_circuit"] = float(data.pop("uc"))
+            self.__depth_data[data["instrument"].symbol]["upper_circuit"] = float(data.pop("uc"))
         if("lc" in data):               # Lower Circuit
-            data["lower_circuit"] = float(data.pop("lc"))
+            self.__depth_data[data["instrument"].symbol]["lower_circuit"] = float(data.pop("lc"))
+
+        data["open_interest"]           = self.__depth_data[data["instrument"].symbol]["open_interest"]
+        data["last_traded_quantity"]    = self.__depth_data[data["instrument"].symbol]["last_traded_quantity"]
+        data["last_traded_time"]        = self.__depth_data[data["instrument"].symbol]["last_traded_time"] 
+        data["total_buy_quantity"]      = self.__depth_data[data["instrument"].symbol]["total_buy_quantity"]
+        data["total_sell_quantity"]     = self.__depth_data[data["instrument"].symbol]["total_sell_quantity"]
+        data["upper_circuit"]           = self.__depth_data[data["instrument"].symbol]["upper_circuit"]
+        data["lower_circuit"]           = self.__depth_data[data["instrument"].symbol]["lower_circuit"]
         return data
 
     def __on_data_callback(self, ws=None, message=None, data_type=None, continue_flag=None):
@@ -674,7 +717,6 @@ class AliceBlue:
                     "transtype"      : transaction_type.value, 
                     "prctyp"         : order_type.value,
                     "qty"            : quantity,
-                    "trading_symbol" : instrument.symbol,
                     "price"          : price,
                     "trigPrice"      : trigger_price,
                     "pCode"          : prod_type

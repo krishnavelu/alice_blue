@@ -175,9 +175,9 @@ Symbols can be retrieved in multiple ways. Once you have the master contract loa
 #### Get a single instrument by it's name:
 Code
 ```python
-tatasteel_nse_eq = alice.get_instrument_by_symbol('NSE', 'TATASTEEL')
-reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE')
-ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC')
+tatasteel_nse_eq = alice.get_instrument_by_symbol('NSE', 'TATASTEEL-EQ')
+reliance_nse_eq = alice.get_instrument_by_symbol('NSE', 'RELIANCE-EQ')
+ongc_bse_eq = alice.get_instrument_by_symbol('BSE', 'ONGC-EQ')
 india_vix_nse_index = alice.get_instrument_by_symbol('NSE', 'India VIX')
 sensex_nse_index = alice.get_instrument_by_symbol('BSE', 'SENSEX')
 nifty50_nse_index = alice.get_instrument_by_symbol('NSE', 'NIFTY 50')
@@ -234,13 +234,13 @@ Please refer to the original documentation [here](https://v2api.aliceblueonline.
 #### Subscribe to a live feed
 Code
 ```python
-alice.subscribe(alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), LiveFeedType.TICK_DATA)
-alice.subscribe(alice.get_instrument_by_symbol('BSE', 'RELIANCE'), LiveFeedType.DEPTH_DATA)
+alice.subscribe(alice.get_instrument_by_symbol('NSE', 'TATASTEEL-EQ'), LiveFeedType.TICK_DATA)
+alice.subscribe(alice.get_instrument_by_symbol('BSE', 'RELIANCE-EQ'), LiveFeedType.DEPTH_DATA)
 ```
 #### Subscribe to multiple instruments in a single call. Give an array of instruments to be subscribed.
 Code
 ```python
-alice.subscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get_instrument_by_symbol('NSE', 'ACC')], LiveFeedType.TICK_DATA)
+alice.subscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL-EQ'), alice.get_instrument_by_symbol('NSE', 'ACC-EQ')], LiveFeedType.TICK_DATA)
 ```
 
 #### Start getting live feed via websocket
@@ -251,7 +251,7 @@ def event_handler_quote_update(message):
 
 alice.start_websocket(subscribe_callback=event_handler_quote_update)
 
-alice.subscribe(alice.get_instrument_by_symbol('NSE', 'ONGC'), LiveFeedType.TICK_DATA)
+alice.subscribe(alice.get_instrument_by_symbol('NSE', 'ONGC-EQ'), LiveFeedType.TICK_DATA)
 sleep(10)
 ```
 
@@ -260,13 +260,13 @@ Unsubscribe to an existing live feed.
 
 Code
 ```python
-alice.unsubscribe(alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), LiveFeedType.TICK_DATA)
-alice.unsubscribe(alice.get_instrument_by_symbol('BSE', 'RELIANCE'), LiveFeedType.DEPTH_DATA)
+alice.unsubscribe(alice.get_instrument_by_symbol('NSE', 'TATASTEEL-EQ'), LiveFeedType.TICK_DATA)
+alice.unsubscribe(alice.get_instrument_by_symbol('BSE', 'RELIANCE-EQ'), LiveFeedType.DEPTH_DATA)
 ```
 #### Unsubscribe to multiple instruments in a single call. Give an array of instruments to be unsubscribed.
 Code
 ```python
-alice.unsubscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL'), alice.get_instrument_by_symbol('NSE', 'ACC')], LiveFeedType.TICK_DATA)
+alice.unsubscribe([alice.get_instrument_by_symbol('NSE', 'TATASTEEL-EQ'), alice.get_instrument_by_symbol('NSE', 'ACC-EQ')], LiveFeedType.TICK_DATA)
 ```
 
 #### Get All Subscribed Symbols
