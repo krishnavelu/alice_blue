@@ -95,7 +95,7 @@ class AliceBlue:
     """ AliceBlue Class for all operations related to AliceBlue Server"""
 
     # URLs
-    host = "https://a3.aliceblueonline.com/rest/AliceBlueAPIService"
+    host = "https://ant.aliceblueonline.com/rest/AliceBlueAPIService"
     __urls = {  "webLogin"              :   f"{host}/customer/webLogin",
                 "twoFA"                 :   f"{host}/sso/validAnswer",
                 "sessionID"             :   f"{host}/sso/getUserDetails",
